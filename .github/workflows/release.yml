@@ -1,5 +1,7 @@
 name: Release
 
+# Manually dispatched: tags vX.Y.Z, cuts a GitHub release, pushes versioned
+# images to ghcr.io. Empty version input auto-bumps the minor from the last tag.
 on:
   workflow_dispatch:
     inputs:
