@@ -1,0 +1,128 @@
+// Package recipes implements the /api/recipes endpoints.
+//
+// PUT is a full replace (every editable field is sent on each update); DELETE
+// is a hard delete. Ingredients and tags are stored as Postgres text[] arrays.
+package recipes
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/Automaat/baratie/backend-go/internal/dbutil"
+)
+
+// Recipe is a single recipe with its ingredient lines and free-form tags.
+type Recipe struct {
+	ID           int
+	Name         string
+	Description  string
+	Instructions string
+	Ingredients  []string
+	Tags         []string
+	Servings     int
+	PrepMinutes  int
+	CookMinutes  int
+	CreatedAt    time.Time
+}
+
+// ErrNotFound is returned when no row matches the supplied id.
+var ErrNotFound = errors.New("recipe not found")
+
+// Store is the persistence boundary for recipes.
+type Store struct {
+	pool *pgxpool.Pool
+}
+
+// NewStore wraps a pool.
+func NewStore(pool *pgxpool.Pool) *Store {
+	return &Store{pool: pool}
+}
+
+const selectColumns = `
+	id, name, description, instructions, ingredients, tags,
+	servings, prep_minutes, cook_minutes, created_at
+`
+
+// List returns every recipe ordered by name.
+func (s *Store) List(ctx context.Context) ([]Recipe, error) {
+	rows, err := s.pool.Query(ctx, `SELECT `+selectColumns+` FROM recipes ORDER BY name`)
+	if err != nil {
+		return nil, fmt.Errorf("select recipes: %w", err)
+	}
+	return dbutil.CollectRows(rows, scanRecipe, "scan recipe", "iterate recipes")
+}
+
+// Get returns a recipe by id; ErrNotFound when absent.
+func (s *Store) Get(ctx context.Context, id int) (*Recipe, error) {
+	row := s.pool.QueryRow(ctx, `SELECT `+selectColumns+` FROM recipes WHERE id = $1`, id)
+	r, err := scanRecipe(row)
+	if err != nil {
+		return nil, dbutil.MapErr(err, ErrNotFound, "select recipe")
+	}
+	return &r, nil
+}
+
+// Create inserts a new recipe and returns the stored row.
+func (s *Store) Create(ctx context.Context, r *Recipe) (*Recipe, error) {
+	row := s.pool.QueryRow(ctx, `
+		INSERT INTO recipes (
+			name, description, instructions, ingredients, tags,
+			servings, prep_minutes, cook_minutes, created_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		RETURNING `+selectColumns,
+		r.Name, r.Description, r.Instructions, r.Ingredients, r.Tags,
+		r.Servings, r.PrepMinutes, r.CookMinutes, time.Now().UTC(),
+	)
+	created, err := scanRecipe(row)
+	if err != nil {
+		return nil, fmt.Errorf("insert recipe: %w", err)
+	}
+	return &created, nil
+}
+
+// Update replaces every editable field of a recipe; ErrNotFound if the id is
+// unknown.
+func (s *Store) Update(ctx context.Context, id int, r *Recipe) (*Recipe, error) {
+	row := s.pool.QueryRow(ctx, `
+		UPDATE recipes SET
+			name = $1, description = $2, instructions = $3, ingredients = $4,
+			tags = $5, servings = $6, prep_minutes = $7, cook_minutes = $8
+		WHERE id = $9
+		RETURNING `+selectColumns,
+		r.Name, r.Description, r.Instructions, r.Ingredients, r.Tags,
+		r.Servings, r.PrepMinutes, r.CookMinutes, id,
+	)
+	updated, err := scanRecipe(row)
+	if err != nil {
+		return nil, dbutil.MapErr(err, ErrNotFound, "update recipe")
+	}
+	return &updated, nil
+}
+
+// Delete removes the recipe (hard delete); ErrNotFound when no row matched.
+func (s *Store) Delete(ctx context.Context, id int) error {
+	tag, err := s.pool.Exec(ctx, `DELETE FROM recipes WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("delete recipe: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func scanRecipe(row pgx.Row) (Recipe, error) {
+	var r Recipe
+	if err := row.Scan(
+		&r.ID, &r.Name, &r.Description, &r.Instructions, &r.Ingredients, &r.Tags,
+		&r.Servings, &r.PrepMinutes, &r.CookMinutes, &r.CreatedAt,
+	); err != nil {
+		return Recipe{}, err
+	}
+	return r, nil
+}

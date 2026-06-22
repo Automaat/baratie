@@ -1,0 +1,62 @@
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# SvelteKit
+.svelte-kit
+build
+.output
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Logs
+logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Data files
+*.db
+*.sqlite
+*.sql
+*.bak
+data/
+
+# backend-go's baseline schema is source (embedded via //go:embed) — track it
+# despite the *.sql ignore above.
+!backend-go/internal/db/schema.sql
+
+# Testing
+coverage
+.coverage
+coverage.xml
+htmlcov/
+
+# Playwright
+playwright-report/
+test-results/
+playwright/.cache/
+blob-report/
+e2e/.auth/
+
+# Misc
+.vercel
+.netlify
+.claude/

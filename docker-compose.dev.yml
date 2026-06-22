@@ -1,0 +1,64 @@
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: baratie-postgres
+    environment:
+      - POSTGRES_USER=baratie
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-password}
+      - POSTGRES_DB=baratie
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - '${POSTGRES_HOST_PORT:-5433}:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U baratie']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  backend-go:
+    build:
+      context: ./backend-go
+    container_name: baratie-backend-go
+    ports:
+      - '8000:8000'
+    environment:
+      - DATABASE_URL=postgresql://baratie:${POSTGRES_PASSWORD:-password}@postgres:5432/baratie
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5174,http://localhost:3000}
+      - BRT_ADDR=:8000
+      - BRT_JWT_SECRET=${BRT_JWT_SECRET:-dev-jwt-secret-change-me}
+      - BRT_ADMIN_USERNAME=${BRT_ADMIN_USERNAME:-admin}
+      - BRT_ADMIN_PASSWORD=${BRT_ADMIN_PASSWORD:-admin}
+      - BRT_COOKIE_SECURE=false
+      - BRT_ACCESS_LOG=${BRT_ACCESS_LOG:-false}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', '/usr/local/bin/api', 'healthcheck']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: baratie-frontend
+    volumes:
+      - .:/app
+      - /app/node_modules
+    ports:
+      - '5174:5173'
+    environment:
+      - PUBLIC_API_URL=http://backend-go:8000
+      - PUBLIC_API_URL_BROWSER=http://localhost:5174
+      - API_PROXY_TARGET=http://backend-go:8000
+      - BRT_COOKIE_SECURE=false
+    depends_on:
+      backend-go:
+        condition: service_healthy
+
+volumes:
+  postgres-data:

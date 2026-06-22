@@ -1,0 +1,47 @@
+services:
+  backend-go:
+    image: ghcr.io/automaat/baratie-backend-go:latest
+    container_name: baratie-backend-go
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql://baratie:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/baratie}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000}
+      - BRT_ADDR=:8000
+      - BRT_JWT_SECRET=${BRT_JWT_SECRET:?BRT_JWT_SECRET must be set}
+      - BRT_ADMIN_USERNAME=${BRT_ADMIN_USERNAME:-admin}
+      - BRT_ADMIN_PASSWORD=${BRT_ADMIN_PASSWORD:?BRT_ADMIN_PASSWORD must be set}
+      - BRT_COOKIE_SECURE=${BRT_COOKIE_SECURE:-false}
+      - BRT_ACCESS_LOG=${BRT_ACCESS_LOG:-false}
+    ports:
+      - '8000:8000'
+    restart: unless-stopped
+    depends_on:
+      - postgres
+
+  frontend:
+    image: ghcr.io/automaat/baratie-frontend:latest
+    container_name: baratie-frontend
+    ports:
+      - '3000:3000'
+    environment:
+      - PUBLIC_API_URL=http://backend-go:8000
+      - PUBLIC_API_URL_BROWSER=${ORIGIN:-http://localhost:3000}
+      - API_PROXY_TARGET=http://backend-go:8000
+      - ORIGIN=${ORIGIN:-http://localhost:3000}
+      - BRT_COOKIE_SECURE=${BRT_COOKIE_SECURE:-false}
+    restart: unless-stopped
+    depends_on:
+      - backend-go
+
+  postgres:
+    image: postgres:18-alpine
+    container_name: baratie-postgres
+    environment:
+      - POSTGRES_USER=baratie
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      - POSTGRES_DB=baratie
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  postgres-data:

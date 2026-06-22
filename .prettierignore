@@ -1,0 +1,28 @@
+.DS_Store
+node_modules
+/build
+/.svelte-kit
+/package
+.env
+.env.*
+!.env.example
+
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# GitHub bot configs
+renovate.json
+.github/renovate.json
+
+# Claude settings
+.claude/settings.local.json
+
+# Planning documents
+CLAUDE.md
+
+# Playwright artifacts
+playwright-report
+test-results
+blob-report
+playwright/.cache

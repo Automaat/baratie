@@ -1,0 +1,23 @@
+[tools]
+node = "24"
+go = "1.26.4"
+"go:github.com/golangci/golangci-lint/v2/cmd/golangci-lint" = "2.12.2"
+# nilaway has no tagged releases. It's installed via `go install` in CI and
+# the scripts/run-nilaway.sh helper using a pinned pseudo-version (see the
+# renovate.json customManager entry that bumps it).
+
+[tasks.dev]
+description = "Start all services for development"
+run = "docker-compose -f docker-compose.dev.yml up --build"
+
+[tasks.down]
+description = "Stop all services"
+run = "docker-compose -f docker-compose.dev.yml down"
+
+[tasks.backend]
+description = "Start backend API only (needs DATABASE_URL)"
+run = "cd backend-go && go run ./cmd/api"
+
+[tasks.frontend]
+description = "Start frontend only"
+run = "npm run dev"

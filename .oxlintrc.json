@@ -1,0 +1,11 @@
+{
+	"plugins": ["typescript"],
+	"categories": {
+		"correctness": "warn",
+		"suspicious": "warn",
+		"perf": "warn"
+	},
+	"rules": {
+		"eslint/no-unassigned-vars": "off"
+	}
+}
