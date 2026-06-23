@@ -19,6 +19,7 @@ import (
 	"github.com/Automaat/baratie/backend-go/internal/auth"
 	"github.com/Automaat/baratie/backend-go/internal/db"
 	"github.com/Automaat/baratie/backend-go/internal/metrics"
+	"github.com/Automaat/baratie/backend-go/internal/recipes"
 	"github.com/Automaat/baratie/backend-go/internal/server"
 )
 
@@ -175,6 +176,11 @@ func initDB(ctx context.Context, dsn string, logger *slog.Logger, adminUsername,
 	authStore := auth.NewStore(pool)
 	if err := authStore.EnsureSchema(ctx); err != nil {
 		logger.Error("ensure users schema", "err", err)
+		pool.Close()
+		return nil, 2
+	}
+	if err := recipes.NewStore(pool).EnsureSchema(ctx); err != nil {
+		logger.Error("ensure recipes schema", "err", err)
 		pool.Close()
 		return nil, 2
 	}

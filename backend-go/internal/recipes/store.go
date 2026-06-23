@@ -17,6 +17,7 @@ import (
 )
 
 // Recipe is a single recipe with its ingredient lines and free-form tags.
+// The macro fields (CaloriesKcal, ProteinG, CarbsG, FatG) are per serving.
 type Recipe struct {
 	ID           int
 	Name         string
@@ -27,6 +28,10 @@ type Recipe struct {
 	Servings     int
 	PrepMinutes  int
 	CookMinutes  int
+	CaloriesKcal float64
+	ProteinG     float64
+	CarbsG       float64
+	FatG         float64
 	CreatedAt    time.Time
 }
 
@@ -43,9 +48,25 @@ func NewStore(pool *pgxpool.Pool) *Store {
 	return &Store{pool: pool}
 }
 
+// EnsureSchema applies additive migrations to the recipes table for existing
+// databases. The baseline schema.sql runs only on empty databases (see
+// db.ApplySchema), so column additions must also run here as idempotent DDL.
+func (s *Store) EnsureSchema(ctx context.Context) error {
+	if _, err := s.pool.Exec(ctx, `
+		ALTER TABLE recipes
+			ADD COLUMN IF NOT EXISTS calories_kcal double precision NOT NULL DEFAULT 0,
+			ADD COLUMN IF NOT EXISTS protein_g double precision NOT NULL DEFAULT 0,
+			ADD COLUMN IF NOT EXISTS carbs_g double precision NOT NULL DEFAULT 0,
+			ADD COLUMN IF NOT EXISTS fat_g double precision NOT NULL DEFAULT 0`); err != nil {
+		return fmt.Errorf("ensure recipes nutrition columns: %w", err)
+	}
+	return nil
+}
+
 const selectColumns = `
 	id, name, description, instructions, ingredients, tags,
-	servings, prep_minutes, cook_minutes, created_at
+	servings, prep_minutes, cook_minutes,
+	calories_kcal, protein_g, carbs_g, fat_g, created_at
 `
 
 // List returns every recipe ordered by name.
@@ -72,11 +93,13 @@ func (s *Store) Create(ctx context.Context, r *Recipe) (*Recipe, error) {
 	row := s.pool.QueryRow(ctx, `
 		INSERT INTO recipes (
 			name, description, instructions, ingredients, tags,
-			servings, prep_minutes, cook_minutes, created_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+			servings, prep_minutes, cook_minutes,
+			calories_kcal, protein_g, carbs_g, fat_g, created_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 		RETURNING `+selectColumns,
 		r.Name, r.Description, r.Instructions, r.Ingredients, r.Tags,
-		r.Servings, r.PrepMinutes, r.CookMinutes, time.Now().UTC(),
+		r.Servings, r.PrepMinutes, r.CookMinutes,
+		r.CaloriesKcal, r.ProteinG, r.CarbsG, r.FatG, time.Now().UTC(),
 	)
 	created, err := scanRecipe(row)
 	if err != nil {
@@ -91,11 +114,13 @@ func (s *Store) Update(ctx context.Context, id int, r *Recipe) (*Recipe, error) 
 	row := s.pool.QueryRow(ctx, `
 		UPDATE recipes SET
 			name = $1, description = $2, instructions = $3, ingredients = $4,
-			tags = $5, servings = $6, prep_minutes = $7, cook_minutes = $8
-		WHERE id = $9
+			tags = $5, servings = $6, prep_minutes = $7, cook_minutes = $8,
+			calories_kcal = $9, protein_g = $10, carbs_g = $11, fat_g = $12
+		WHERE id = $13
 		RETURNING `+selectColumns,
 		r.Name, r.Description, r.Instructions, r.Ingredients, r.Tags,
-		r.Servings, r.PrepMinutes, r.CookMinutes, id,
+		r.Servings, r.PrepMinutes, r.CookMinutes,
+		r.CaloriesKcal, r.ProteinG, r.CarbsG, r.FatG, id,
 	)
 	updated, err := scanRecipe(row)
 	if err != nil {
@@ -120,7 +145,8 @@ func scanRecipe(row pgx.Row) (Recipe, error) {
 	var r Recipe
 	if err := row.Scan(
 		&r.ID, &r.Name, &r.Description, &r.Instructions, &r.Ingredients, &r.Tags,
-		&r.Servings, &r.PrepMinutes, &r.CookMinutes, &r.CreatedAt,
+		&r.Servings, &r.PrepMinutes, &r.CookMinutes,
+		&r.CaloriesKcal, &r.ProteinG, &r.CarbsG, &r.FatG, &r.CreatedAt,
 	); err != nil {
 		return Recipe{}, err
 	}

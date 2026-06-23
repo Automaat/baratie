@@ -13,6 +13,10 @@ export interface Recipe {
 	prep_minutes: number;
 	cook_minutes: number;
 	total_minutes: number;
+	calories_kcal: number;
+	protein_g: number;
+	carbs_g: number;
+	fat_g: number;
 	created_at: string;
 }
 

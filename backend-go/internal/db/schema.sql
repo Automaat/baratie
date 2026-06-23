@@ -13,6 +13,10 @@ CREATE TABLE recipes (
     servings integer NOT NULL DEFAULT 1,
     prep_minutes integer NOT NULL DEFAULT 0,
     cook_minutes integer NOT NULL DEFAULT 0,
+    calories_kcal double precision NOT NULL DEFAULT 0,
+    protein_g double precision NOT NULL DEFAULT 0,
+    carbs_g double precision NOT NULL DEFAULT 0,
+    fat_g double precision NOT NULL DEFAULT 0,
     created_at timestamp without time zone NOT NULL DEFAULT (now() AT TIME ZONE 'utc')
 );
 
