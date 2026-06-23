@@ -283,7 +283,7 @@ func validateIngredients(in []ingredientInput) ([]IngredientInput, *httputil.Val
 		if item.Amount < 0 {
 			return nil, &httputil.ValidationError{Field: "amount", Msg: "Amount cannot be negative"}
 		}
-		unit := strings.TrimSpace(item.Unit)
+		unit := strings.ToLower(strings.TrimSpace(item.Unit))
 		if unit == "" {
 			unit = units.Gram
 		}

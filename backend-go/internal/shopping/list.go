@@ -30,7 +30,17 @@ type aggregate struct {
 func build(structured []StructuredLine, freeform []PlannedRecipe, pantryNames []string) []Item {
 	pantry := normalizeNames(pantryNames)
 	items := buildStructured(structured, pantry)
-	return append(items, buildFreeform(freeform, pantry)...)
+	items = append(items, buildFreeform(freeform, pantry)...)
+	// Keep one stable, globally-sorted list (by name, then unit) regardless of
+	// the structured/free-form split.
+	sort.Slice(items, func(i, j int) bool {
+		ni, nj := strings.ToLower(items[i].Name), strings.ToLower(items[j].Name)
+		if ni != nj {
+			return ni < nj
+		}
+		return items[i].Unit < items[j].Unit
+	})
+	return items
 }
 
 // buildStructured sums structured amounts per (food, unit).
