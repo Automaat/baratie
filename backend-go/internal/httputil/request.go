@@ -5,6 +5,8 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -36,4 +38,19 @@ func PathIntField(w http.ResponseWriter, r *http.Request, param, field string) (
 		return 0, false
 	}
 	return id, true
+}
+
+// OptionalDate parses an optional YYYY-MM-DD query value. An empty value yields
+// (nil, true) — an open bound. A malformed value writes a 422 and returns
+// (nil, false) so the caller can stop.
+func OptionalDate(w http.ResponseWriter, raw, field string) (*time.Time, bool) {
+	if strings.TrimSpace(raw) == "" {
+		return nil, true
+	}
+	t, err := time.Parse("2006-01-02", strings.TrimSpace(raw))
+	if err != nil {
+		WriteBodyValidationError(w, field, "must be YYYY-MM-DD", raw)
+		return nil, false
+	}
+	return &t, true
 }
