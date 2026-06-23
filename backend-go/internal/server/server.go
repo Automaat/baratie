@@ -137,7 +137,7 @@ func registerRoutes(r chi.Router, cfg Config, pool *pgxpool.Pool, logger *slog.L
 	// Everything else requires authentication — a session JWT or a personal
 	// access token.
 	r.Group(func(r chi.Router) {
-		r.Use(auth.Authenticate(tokens, pats))
+		r.Use(auth.Authenticate(tokens, pats, logger))
 		r.Get("/api/auth/me", authHandler.Me)
 		r.Get("/api/users", authHandler.ListOwners)
 		r.Get("/api/auth/tokens", authHandler.ListTokens)

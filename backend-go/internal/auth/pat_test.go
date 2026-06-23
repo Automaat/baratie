@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -80,7 +82,30 @@ func TestValidateTokenExpiry(t *testing.T) {
 	if vErr := validateToken(&req); vErr != nil {
 		t.Fatalf("unexpected error: %+v", vErr)
 	}
-	if req.expiresAt == nil || !req.expiresAt.After(time.Now().UTC()) {
-		t.Fatalf("expiresAt not set to a future time: %v", req.expiresAt)
+	if req.expiresAt == nil {
+		t.Fatal("expiresAt not set")
+	}
+	// Pin the end-of-day semantics: a YYYY-MM-DD expiry must resolve to the
+	// last microsecond of that UTC day, not its midnight. Guards the
+	// Add(24h - time.Microsecond) in validateToken against a silent regression
+	// that would expire tokens a full day early.
+	day, _ := time.Parse("2006-01-02", future)
+	wantExpiry := day.Add(24*time.Hour - time.Microsecond)
+	if !req.expiresAt.Equal(wantExpiry) {
+		t.Fatalf("expiresAt = %v, want end of day %v", req.expiresAt, wantExpiry)
+	}
+}
+
+// TestResolveClaimsJWTErrorIsCredential guards the 401-vs-500 split: a failed
+// JWT verification is a bad credential (401), never an infrastructure fault, so
+// it must not carry errAuthUnavailable.
+func TestResolveClaimsJWTErrorIsCredential(t *testing.T) {
+	ts := NewTokenService("test-secret")
+	_, err := resolveClaims(context.Background(), ts, nil, "not-a-jwt")
+	if err == nil {
+		t.Fatal("expected error for malformed token")
+	}
+	if errors.Is(err, errAuthUnavailable) {
+		t.Fatal("JWT verify error must not be tagged as infra-unavailable")
 	}
 }

@@ -105,7 +105,7 @@ func (s *PATStore) Create(ctx context.Context, userID int, name string, expiresA
 // List returns a user's tokens (metadata only), newest first.
 func (s *PATStore) List(ctx context.Context, userID int) ([]PersonalAccessToken, error) {
 	rows, err := s.pool.Query(ctx,
-		`SELECT `+patColumns+` FROM personal_access_tokens WHERE user_id = $1 ORDER BY created_at DESC`,
+		`SELECT `+patColumns+` FROM personal_access_tokens WHERE user_id = $1 ORDER BY created_at DESC, id DESC`,
 		userID)
 	if err != nil {
 		return nil, fmt.Errorf("select tokens: %w", err)
