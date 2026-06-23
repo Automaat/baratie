@@ -18,8 +18,16 @@ test('creates a recipe', async ({ page }) => {
 
 	// The name is the first text input in the modal form.
 	await dialog.locator('input[type="text"]').first().fill(name);
+	// First number input under the nutrition fieldset is calories per serving.
+	await dialog.locator('fieldset input[type="number"]').first().fill('500');
 	await dialog.getByRole('button', { name: 'Zapisz' }).click();
 
 	await expect(dialog).toBeHidden();
 	await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
+
+	// The macros round-trip and render on the new recipe card.
+	const card = page.locator('article', {
+		has: page.getByRole('heading', { name, exact: true })
+	});
+	await expect(card.getByText('500 kcal')).toBeVisible();
 });

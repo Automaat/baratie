@@ -25,8 +25,31 @@ func validate(req *createRequest) *httputil.ValidationError {
 	if req.CookMinutes < 0 {
 		return &httputil.ValidationError{Field: "cook_minutes", Msg: "Cook minutes cannot be negative"}
 	}
+	if vErr := validateMacros(req); vErr != nil {
+		return vErr
+	}
 	req.Ingredients = cleanStrings(req.Ingredients)
 	req.Tags = cleanStrings(req.Tags)
+	return nil
+}
+
+// validateMacros rejects negative per-serving nutrition values.
+func validateMacros(req *createRequest) *httputil.ValidationError {
+	macros := []struct {
+		field string
+		value float64
+		label string
+	}{
+		{"calories_kcal", req.CaloriesKcal, "Calories"},
+		{"protein_g", req.ProteinG, "Protein"},
+		{"carbs_g", req.CarbsG, "Carbs"},
+		{"fat_g", req.FatG, "Fat"},
+	}
+	for _, m := range macros {
+		if m.value < 0 {
+			return &httputil.ValidationError{Field: m.field, Msg: m.label + " cannot be negative"}
+		}
+	}
 	return nil
 }
 

@@ -5,8 +5,8 @@
 	import { CrudForm } from '$lib/stores/crudForm.svelte';
 	import { confirm } from '$lib/stores/confirm.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
-	import { formatMinutes } from '$lib/utils/format';
-	import { BookOpen, Plus, Pencil, Trash2, Clock, Users } from 'lucide-svelte';
+	import { formatMinutes, formatQuantity } from '$lib/utils/format';
+	import { BookOpen, Plus, Pencil, Trash2, Clock, Users, Flame } from 'lucide-svelte';
 	import type { Recipe } from './+page';
 	import type { PageData } from './$types';
 
@@ -23,7 +23,11 @@
 		tags: '',
 		servings: 2,
 		prep_minutes: 0,
-		cook_minutes: 0
+		cook_minutes: 0,
+		calories_kcal: 0,
+		protein_g: 0,
+		carbs_g: 0,
+		fat_g: 0
 	});
 
 	let formData = $state(emptyForm());
@@ -39,7 +43,11 @@
 				tags: editing.tags.join(', '),
 				servings: editing.servings,
 				prep_minutes: editing.prep_minutes,
-				cook_minutes: editing.cook_minutes
+				cook_minutes: editing.cook_minutes,
+				calories_kcal: editing.calories_kcal,
+				protein_g: editing.protein_g,
+				carbs_g: editing.carbs_g,
+				fat_g: editing.fat_g
 			};
 		} else if (form.open) {
 			formData = emptyForm();
@@ -61,7 +69,11 @@
 				.filter(Boolean),
 			servings: Number(formData.servings),
 			prep_minutes: Number(formData.prep_minutes),
-			cook_minutes: Number(formData.cook_minutes)
+			cook_minutes: Number(formData.cook_minutes),
+			calories_kcal: Number(formData.calories_kcal),
+			protein_g: Number(formData.protein_g),
+			carbs_g: Number(formData.carbs_g),
+			fat_g: Number(formData.fat_g)
 		};
 	}
 
@@ -154,6 +166,19 @@
 						<span>{recipe.ingredients.length} składników</span>
 					</div>
 
+					{#if recipe.calories_kcal > 0 || recipe.protein_g > 0 || recipe.carbs_g > 0 || recipe.fat_g > 0}
+						<div class="flex flex-wrap gap-3 text-xs text-surface-700-300">
+							<span class="flex items-center gap-1">
+								<Flame size={14} />
+								{formatQuantity(recipe.calories_kcal)} kcal
+							</span>
+							<span>B {formatQuantity(recipe.protein_g)} g</span>
+							<span>W {formatQuantity(recipe.carbs_g)} g</span>
+							<span>T {formatQuantity(recipe.fat_g)} g</span>
+							<span class="text-surface-500">na porcję</span>
+						</div>
+					{/if}
+
 					{#if recipe.tags.length > 0}
 						<div class="flex flex-wrap gap-1 mt-auto">
 							{#each recipe.tags as tag (tag)}
@@ -215,6 +240,27 @@
 				placeholder="szybkie, wegańskie"
 			/>
 		</label>
+		<fieldset class="space-y-2">
+			<legend class="text-sm font-semibold">Wartości odżywcze (na porcję)</legend>
+			<div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+				<label class="label">
+					<span>Kalorie (kcal)</span>
+					<input class="input" type="number" min="0" step="1" bind:value={formData.calories_kcal} />
+				</label>
+				<label class="label">
+					<span>Białko (g)</span>
+					<input class="input" type="number" min="0" step="0.1" bind:value={formData.protein_g} />
+				</label>
+				<label class="label">
+					<span>Węgl. (g)</span>
+					<input class="input" type="number" min="0" step="0.1" bind:value={formData.carbs_g} />
+				</label>
+				<label class="label">
+					<span>Tłuszcz (g)</span>
+					<input class="input" type="number" min="0" step="0.1" bind:value={formData.fat_g} />
+				</label>
+			</div>
+		</fieldset>
 		{#if form.error}
 			<div class="card preset-tonal-error-500 p-2 text-sm" role="alert">{form.error}</div>
 		{/if}

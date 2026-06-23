@@ -21,6 +21,10 @@ type response struct {
 	PrepMinutes  int           `json:"prep_minutes"`
 	CookMinutes  int           `json:"cook_minutes"`
 	TotalMinutes int           `json:"total_minutes"`
+	CaloriesKcal float64       `json:"calories_kcal"`
+	ProteinG     float64       `json:"protein_g"`
+	CarbsG       float64       `json:"carbs_g"`
+	FatG         float64       `json:"fat_g"`
 	CreatedAt    wire.IsoNaive `json:"created_at"`
 }
 
@@ -34,6 +38,10 @@ type createRequest struct {
 	Servings     int      `json:"servings"`
 	PrepMinutes  int      `json:"prep_minutes"`
 	CookMinutes  int      `json:"cook_minutes"`
+	CaloriesKcal float64  `json:"calories_kcal"`
+	ProteinG     float64  `json:"protein_g"`
+	CarbsG       float64  `json:"carbs_g"`
+	FatG         float64  `json:"fat_g"`
 }
 
 // Handler is the HTTP boundary for /api/recipes.
@@ -62,6 +70,10 @@ func toResponse(r *Recipe) response {
 		PrepMinutes:  r.PrepMinutes,
 		CookMinutes:  r.CookMinutes,
 		TotalMinutes: r.PrepMinutes + r.CookMinutes,
+		CaloriesKcal: r.CaloriesKcal,
+		ProteinG:     r.ProteinG,
+		CarbsG:       r.CarbsG,
+		FatG:         r.FatG,
 		CreatedAt:    wire.IsoNaive(r.CreatedAt),
 	}
 }
@@ -76,6 +88,10 @@ func toRecipe(req *createRequest) *Recipe {
 		Servings:     req.Servings,
 		PrepMinutes:  req.PrepMinutes,
 		CookMinutes:  req.CookMinutes,
+		CaloriesKcal: req.CaloriesKcal,
+		ProteinG:     req.ProteinG,
+		CarbsG:       req.CarbsG,
+		FatG:         req.FatG,
 	}
 }
 
