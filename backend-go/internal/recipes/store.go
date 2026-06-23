@@ -33,6 +33,9 @@ type Recipe struct {
 	CarbsG       float64
 	FatG         float64
 	CreatedAt    time.Time
+	// Structured holds the recipe's food-linked ingredients, populated on
+	// reads (List/Get). Nil/empty when the recipe has none.
+	Structured []StructuredIngredient
 }
 
 // ErrNotFound is returned when no row matches the supplied id.
@@ -69,22 +72,44 @@ const selectColumns = `
 	calories_kcal, protein_g, carbs_g, fat_g, created_at
 `
 
-// List returns every recipe ordered by name.
+// List returns every recipe ordered by name, each with its structured
+// ingredients attached.
 func (s *Store) List(ctx context.Context) ([]Recipe, error) {
 	rows, err := s.pool.Query(ctx, `SELECT `+selectColumns+` FROM recipes ORDER BY name`)
 	if err != nil {
 		return nil, fmt.Errorf("select recipes: %w", err)
 	}
-	return dbutil.CollectRows(rows, scanRecipe, "scan recipe", "iterate recipes")
+	list, err := dbutil.CollectRows(rows, scanRecipe, "scan recipe", "iterate recipes")
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]int, len(list))
+	for i := range list {
+		ids[i] = list[i].ID
+	}
+	byRecipe, err := s.IngredientsForRecipes(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	for i := range list {
+		list[i].Structured = byRecipe[list[i].ID]
+	}
+	return list, nil
 }
 
-// Get returns a recipe by id; ErrNotFound when absent.
+// Get returns a recipe by id with its structured ingredients; ErrNotFound when
+// absent.
 func (s *Store) Get(ctx context.Context, id int) (*Recipe, error) {
 	row := s.pool.QueryRow(ctx, `SELECT `+selectColumns+` FROM recipes WHERE id = $1`, id)
 	r, err := scanRecipe(row)
 	if err != nil {
 		return nil, dbutil.MapErr(err, ErrNotFound, "select recipe")
 	}
+	ings, err := s.IngredientsByRecipe(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	r.Structured = ings
 	return &r, nil
 }
 
@@ -109,24 +134,40 @@ func (s *Store) Create(ctx context.Context, r *Recipe) (*Recipe, error) {
 }
 
 // Update replaces every editable field of a recipe; ErrNotFound if the id is
-// unknown.
+// unknown. The macro columns are set from the request, then overwritten with
+// values computed from the recipe's structured ingredients when those carry
+// usable macro data (so structured ingredients take precedence over the manual
+// fields). Runs in a transaction so the update + recompute are atomic.
 func (s *Store) Update(ctx context.Context, id int, r *Recipe) (*Recipe, error) {
-	row := s.pool.QueryRow(ctx, `
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("begin update tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	tag, err := tx.Exec(ctx, `
 		UPDATE recipes SET
 			name = $1, description = $2, instructions = $3, ingredients = $4,
 			tags = $5, servings = $6, prep_minutes = $7, cook_minutes = $8,
 			calories_kcal = $9, protein_g = $10, carbs_g = $11, fat_g = $12
-		WHERE id = $13
-		RETURNING `+selectColumns,
+		WHERE id = $13`,
 		r.Name, r.Description, r.Instructions, r.Ingredients, r.Tags,
 		r.Servings, r.PrepMinutes, r.CookMinutes,
 		r.CaloriesKcal, r.ProteinG, r.CarbsG, r.FatG, id,
 	)
-	updated, err := scanRecipe(row)
 	if err != nil {
-		return nil, dbutil.MapErr(err, ErrNotFound, "update recipe")
+		return nil, fmt.Errorf("update recipe: %w", err)
 	}
-	return &updated, nil
+	if tag.RowsAffected() == 0 {
+		return nil, ErrNotFound
+	}
+	if err := recomputeMacros(ctx, tx, id, r.Servings); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit update tx: %w", err)
+	}
+	return s.Get(ctx, id)
 }
 
 // Delete removes the recipe (hard delete); ErrNotFound when no row matched.
