@@ -48,6 +48,9 @@ clean scaffold.
 - **nutrition** (`/api/nutrition/summary`) — read-only macro aggregation from the
   meal plan over `date_from`/`date_to`: per-day + period totals and average, with
   optional `target_*` query params yielding per-day deltas. No own table.
+- **shopping** (`/api/shopping-list`) — read-only consolidated ingredient list
+  from recipes planned over `date_from`/`date_to`, deduped by normalized text,
+  with source recipes + best-effort pantry cross-off. No own table.
 - **auth** (`/api/auth/*`, `/api/users`) — login/logout/me, admin-only user CRUD.
 
 ---
