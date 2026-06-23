@@ -8,8 +8,12 @@ import (
 )
 
 // itemResponse is the JSON shape for one consolidated shopping-list line.
+// amount/unit are populated for structured ingredients (summed per food/unit)
+// and zero/empty for free-form ingredients.
 type itemResponse struct {
 	Name     string   `json:"name"`
+	Amount   float64  `json:"amount"`
+	Unit     string   `json:"unit"`
 	Recipes  []string `json:"recipes"`
 	InPantry bool     `json:"in_pantry"`
 }
@@ -46,6 +50,12 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	structured, err := h.store.PlannedStructured(r.Context(), from, to)
+	if err != nil {
+		h.logger.Error("shopping list: structured ingredients", "err", err)
+		httputil.WriteDetailError(w, http.StatusInternalServerError, "Internal Server Error")
+		return
+	}
 	planned, err := h.store.PlannedRecipes(r.Context(), from, to)
 	if err != nil {
 		h.logger.Error("shopping list: planned recipes", "err", err)
@@ -58,7 +68,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		httputil.WriteDetailError(w, http.StatusInternalServerError, "Internal Server Error")
 		return
 	}
-	httputil.WriteJSON(w, http.StatusOK, toResponse(build(planned, pantry)))
+	httputil.WriteJSON(w, http.StatusOK, toResponse(build(structured, planned, pantry)))
 }
 
 func toResponse(items []Item) listResponse {

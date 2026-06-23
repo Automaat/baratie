@@ -6,6 +6,7 @@ import { test, expect } from '@playwright/test';
 const sections = [
 	{ path: '/', heading: 'Pulpit' },
 	{ path: '/recipes', heading: 'Przepisy' },
+	{ path: '/foods', heading: 'Baza produktów' },
 	{ path: '/pantry', heading: 'Spiżarnia' },
 	{ path: '/meal-plan', heading: 'Plan posiłków' },
 	{ path: '/settings', heading: 'Ustawienia' }

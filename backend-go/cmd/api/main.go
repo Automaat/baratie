@@ -18,6 +18,7 @@ import (
 
 	"github.com/Automaat/baratie/backend-go/internal/auth"
 	"github.com/Automaat/baratie/backend-go/internal/db"
+	"github.com/Automaat/baratie/backend-go/internal/foods"
 	"github.com/Automaat/baratie/backend-go/internal/metrics"
 	"github.com/Automaat/baratie/backend-go/internal/recipes"
 	"github.com/Automaat/baratie/backend-go/internal/server"
@@ -183,6 +184,21 @@ func initDB(ctx context.Context, dsn string, logger *slog.Logger, adminUsername,
 		logger.Error("ensure recipes schema", "err", err)
 		pool.Close()
 		return nil, 2
+	}
+	foodStore := foods.NewStore(pool)
+	if err := foodStore.EnsureSchema(ctx); err != nil {
+		logger.Error("ensure foods schema", "err", err)
+		pool.Close()
+		return nil, 2
+	}
+	migrated, err := foodStore.MigrateFreeformIngredients(ctx, logger)
+	if err != nil {
+		logger.Error("migrate free-form ingredients", "err", err)
+		pool.Close()
+		return nil, 2
+	}
+	if migrated > 0 {
+		logger.Info("migrated free-form ingredients", "recipes", migrated)
 	}
 	adminHash, err := auth.HashPassword(adminPassword)
 	if err != nil {

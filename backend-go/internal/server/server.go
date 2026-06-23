@@ -18,6 +18,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/Automaat/baratie/backend-go/internal/auth"
+	"github.com/Automaat/baratie/backend-go/internal/foods"
 	"github.com/Automaat/baratie/backend-go/internal/mealplan"
 	"github.com/Automaat/baratie/backend-go/internal/metrics"
 	"github.com/Automaat/baratie/backend-go/internal/nutrition"
@@ -152,6 +153,15 @@ func registerDomainRoutes(r chi.Router, pool *pgxpool.Pool, logger *slog.Logger)
 		r.Get("/{id}", recipesHandler.Get)
 		r.Put("/{id}", recipesHandler.Update)
 		r.Delete("/{id}", recipesHandler.Delete)
+		r.Put("/{id}/ingredients", recipesHandler.ReplaceIngredients)
+	})
+
+	foodsHandler := foods.NewHandler(foods.NewStore(pool), logger)
+	r.Route("/api/foods", func(r chi.Router) {
+		r.Get("/", foodsHandler.List)
+		r.Post("/", foodsHandler.Create)
+		r.Put("/{id}", foodsHandler.Update)
+		r.Delete("/{id}", foodsHandler.Delete)
 	})
 
 	pantryHandler := pantry.NewHandler(pantry.NewStore(pool), logger)

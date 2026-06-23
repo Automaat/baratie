@@ -4,8 +4,10 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/Automaat/baratie/backend-go/internal/httputil"
+	"github.com/Automaat/baratie/backend-go/internal/units"
 	"github.com/Automaat/baratie/backend-go/internal/wire"
 )
 
@@ -25,7 +27,33 @@ type response struct {
 	ProteinG     float64       `json:"protein_g"`
 	CarbsG       float64       `json:"carbs_g"`
 	FatG         float64       `json:"fat_g"`
+	Structured   []ingredient  `json:"ingredients_structured"`
 	CreatedAt    wire.IsoNaive `json:"created_at"`
+}
+
+// ingredient is the JSON shape for a structured (food-linked) ingredient.
+type ingredient struct {
+	ID             int     `json:"id"`
+	FoodID         int     `json:"food_id"`
+	FoodName       string  `json:"food_name"`
+	Amount         float64 `json:"amount"`
+	Unit           string  `json:"unit"`
+	KcalPer100g    float64 `json:"kcal_per_100g"`
+	ProteinPer100g float64 `json:"protein_per_100g"`
+	CarbsPer100g   float64 `json:"carbs_per_100g"`
+	FatPer100g     float64 `json:"fat_per_100g"`
+}
+
+// ingredientsRequest is the body accepted by PUT /api/recipes/{id}/ingredients.
+type ingredientsRequest struct {
+	Ingredients []ingredientInput `json:"ingredients"`
+}
+
+// ingredientInput is one structured ingredient on the write path.
+type ingredientInput struct {
+	FoodID int     `json:"food_id"`
+	Amount float64 `json:"amount"`
+	Unit   string  `json:"unit"`
 }
 
 // createRequest is the body accepted by POST and PUT.
@@ -74,8 +102,27 @@ func toResponse(r *Recipe) response {
 		ProteinG:     r.ProteinG,
 		CarbsG:       r.CarbsG,
 		FatG:         r.FatG,
+		Structured:   toIngredients(r.Structured),
 		CreatedAt:    wire.IsoNaive(r.CreatedAt),
 	}
+}
+
+func toIngredients(in []StructuredIngredient) []ingredient {
+	out := make([]ingredient, 0, len(in))
+	for _, si := range in {
+		out = append(out, ingredient{
+			ID:             si.ID,
+			FoodID:         si.FoodID,
+			FoodName:       si.FoodName,
+			Amount:         si.Amount,
+			Unit:           si.Unit,
+			KcalPer100g:    si.KcalPer100g,
+			ProteinPer100g: si.ProteinPer100g,
+			CarbsPer100g:   si.CarbsPer100g,
+			FatPer100g:     si.FatPer100g,
+		})
+	}
+	return out
 }
 
 func toRecipe(req *createRequest) *Recipe {
@@ -191,4 +238,59 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// ReplaceIngredients serves PUT /api/recipes/{id}/ingredients — a full replace
+// of the recipe's structured (food-linked) ingredients.
+func (h *Handler) ReplaceIngredients(w http.ResponseWriter, r *http.Request) {
+	id, ok := httputil.PathIntField(w, r, "id", "recipe_id")
+	if !ok {
+		return
+	}
+	var req ingredientsRequest
+	if !httputil.DecodeJSON(w, r, 1<<18, &req) {
+		return
+	}
+	inputs, vErr := validateIngredients(req.Ingredients)
+	if vErr != nil {
+		httputil.WriteValidationError(w, vErr)
+		return
+	}
+	updated, err := h.store.ReplaceIngredients(r.Context(), id, inputs)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrNotFound):
+			httputil.WriteDetailError(w, http.StatusNotFound, "Recipe not found")
+		case errors.Is(err, ErrFoodMissing):
+			httputil.WriteBodyValidationError(w, "food_id", "references a food that does not exist", "")
+		default:
+			h.logger.Error("replace recipe ingredients", "err", err)
+			httputil.WriteDetailError(w, http.StatusInternalServerError, "Internal Server Error")
+		}
+		return
+	}
+	httputil.WriteJSON(w, http.StatusOK, toResponse(updated))
+}
+
+// validateIngredients normalizes the inputs (defaulting blank units to grams)
+// and rejects bad food ids, negative amounts and unknown units.
+func validateIngredients(in []ingredientInput) ([]IngredientInput, *httputil.ValidationError) {
+	out := make([]IngredientInput, 0, len(in))
+	for _, item := range in {
+		if item.FoodID <= 0 {
+			return nil, &httputil.ValidationError{Field: "food_id", Msg: "must be a positive food id"}
+		}
+		if item.Amount < 0 {
+			return nil, &httputil.ValidationError{Field: "amount", Msg: "Amount cannot be negative"}
+		}
+		unit := strings.ToLower(strings.TrimSpace(item.Unit))
+		if unit == "" {
+			unit = units.Gram
+		}
+		if !units.Known(unit) {
+			return nil, &httputil.ValidationError{Field: "unit", Msg: "unknown unit"}
+		}
+		out = append(out, IngredientInput{FoodID: item.FoodID, Amount: item.Amount, Unit: unit})
+	}
+	return out, nil
 }

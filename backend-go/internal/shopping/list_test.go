@@ -10,7 +10,7 @@ func TestBuildDedupesAndAttributesRecipes(t *testing.T) {
 		{Name: "Soup", Ingredients: []string{"Tomato", "  Basil ", "salt"}},
 		{Name: "Salad", Ingredients: []string{"tomato", "Olive oil"}},
 	}
-	items := build(recipes, nil)
+	items := build(nil, recipes, nil)
 
 	// "Tomato"/"tomato" collapse to one entry, keeping the first-seen display.
 	var tomato *Item
@@ -35,11 +35,52 @@ func TestBuildDedupesAndAttributesRecipes(t *testing.T) {
 	}
 }
 
+func TestBuildStructuredSumsPerFoodUnit(t *testing.T) {
+	lines := []StructuredLine{
+		{Recipe: "Bowl", Food: "Chicken", Amount: 200, Unit: "g"},
+		{Recipe: "Wrap", Food: "chicken", Amount: 150, Unit: "g"},
+		{Recipe: "Bowl", Food: "Rice", Amount: 100, Unit: "g"},
+		{Recipe: "Snack", Food: "Egg", Amount: 2, Unit: "szt"},
+	}
+	items := build(lines, nil, nil)
+
+	var chicken *Item
+	for i := range items {
+		if items[i].Name == "Chicken" {
+			chicken = &items[i]
+		}
+	}
+	if chicken == nil {
+		t.Fatalf("chicken not in list: %+v", items)
+	}
+	// 200 g + 150 g summed across recipes (case-insensitive food name).
+	if chicken.Amount != 350 || chicken.Unit != "g" {
+		t.Fatalf("chicken = %v %s, want 350 g", chicken.Amount, chicken.Unit)
+	}
+	if !reflect.DeepEqual(chicken.Recipes, []string{"Bowl", "Wrap"}) {
+		t.Fatalf("chicken recipes = %v, want [Bowl Wrap]", chicken.Recipes)
+	}
+	if len(items) != 3 {
+		t.Fatalf("items = %d (%v), want 3 (chicken, rice, egg)", len(items), items)
+	}
+}
+
+func TestBuildStructuredSeparatesByUnit(t *testing.T) {
+	lines := []StructuredLine{
+		{Recipe: "A", Food: "Milk", Amount: 200, Unit: "ml"},
+		{Recipe: "B", Food: "Milk", Amount: 1, Unit: "l"},
+	}
+	items := build(lines, nil, nil)
+	if len(items) != 2 {
+		t.Fatalf("items = %d, want 2 (ml and l are distinct units)", len(items))
+	}
+}
+
 func TestBuildCrossOffPantry(t *testing.T) {
 	recipes := []PlannedRecipe{
 		{Name: "Omelette", Ingredients: []string{"3 eggs", "butter", "chives"}},
 	}
-	items := build(recipes, []string{"Egg", "  BUTTER  "})
+	items := build(nil, recipes, []string{"Egg", "  BUTTER  "})
 
 	got := map[string]bool{}
 	for _, it := range items {
@@ -57,11 +98,11 @@ func TestBuildCrossOffPantry(t *testing.T) {
 }
 
 func TestBuildEmpty(t *testing.T) {
-	if items := build(nil, nil); len(items) != 0 {
+	if items := build(nil, nil, nil); len(items) != 0 {
 		t.Fatalf("items = %v, want empty", items)
 	}
 	// Blank ingredient lines are dropped.
-	items := build([]PlannedRecipe{{Name: "X", Ingredients: []string{"", "  "}}}, nil)
+	items := build(nil, []PlannedRecipe{{Name: "X", Ingredients: []string{"", "  "}}}, nil)
 	if len(items) != 0 {
 		t.Fatalf("blank ingredients should be dropped, got %v", items)
 	}

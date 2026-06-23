@@ -5,27 +5,84 @@ import (
 	"strings"
 )
 
-// Item is one consolidated shopping-list line: a deduped ingredient, the
-// recipes that call for it, and whether it appears to be in the pantry already.
+// Item is one consolidated shopping-list line. Structured ingredients carry a
+// summed Amount + Unit; free-form ingredients leave Amount 0 and Unit empty.
 type Item struct {
 	Name     string
+	Amount   float64
+	Unit     string
 	Recipes  []string
 	InPantry bool
 }
 
-// aggregate is the per-ingredient accumulator keyed by normalized text.
+// aggregate is the per-ingredient accumulator.
 type aggregate struct {
-	name    string              // first-seen display form (trimmed original)
+	name    string              // first-seen display form
+	amount  float64             // summed amount (structured only)
+	unit    string              // unit (structured only)
 	recipes map[string]struct{} // source recipe names (set)
 }
 
-// build consolidates the ingredient lines of the planned recipes into a deduped
-// list (by case-insensitive trimmed text), records which recipes call for each
-// ingredient, and flags items whose text contains a pantry item name
-// (best-effort cross-off — free-form strings limit accuracy).
-func build(recipes []PlannedRecipe, pantryNames []string) []Item {
+// build consolidates the planned recipes' ingredients. Structured ingredients
+// are summed per food+unit; free-form ingredients (recipes without structured
+// data) are deduped by normalized text. Both record their source recipes and a
+// best-effort pantry cross-off.
+func build(structured []StructuredLine, freeform []PlannedRecipe, pantryNames []string) []Item {
 	pantry := normalizeNames(pantryNames)
+	items := buildStructured(structured, pantry)
+	items = append(items, buildFreeform(freeform, pantry)...)
+	// Keep one stable, globally-sorted list (by name, then unit) regardless of
+	// the structured/free-form split.
+	sort.Slice(items, func(i, j int) bool {
+		ni, nj := strings.ToLower(items[i].Name), strings.ToLower(items[j].Name)
+		if ni != nj {
+			return ni < nj
+		}
+		return items[i].Unit < items[j].Unit
+	})
+	return items
+}
 
+// buildStructured sums structured amounts per (food, unit).
+func buildStructured(lines []StructuredLine, pantry []string) []Item {
+	byKey := map[string]aggregate{}
+	keys := []string{}
+	for _, l := range lines {
+		food := strings.TrimSpace(l.Food)
+		if food == "" {
+			continue
+		}
+		unit := strings.ToLower(strings.TrimSpace(l.Unit))
+		key := strings.ToLower(food) + "\x00" + unit
+		a, ok := byKey[key]
+		if !ok {
+			a = aggregate{name: food, unit: unit, recipes: map[string]struct{}{}}
+			keys = append(keys, key)
+		}
+		a.amount += l.Amount
+		if r := strings.TrimSpace(l.Recipe); r != "" {
+			a.recipes[r] = struct{}{}
+		}
+		byKey[key] = a // amount is a value field, so write the struct back
+	}
+	sort.Strings(keys)
+
+	items := make([]Item, 0, len(keys))
+	for _, k := range keys {
+		a := byKey[k]
+		items = append(items, Item{
+			Name:     a.name,
+			Amount:   a.amount,
+			Unit:     a.unit,
+			Recipes:  sortedKeys(a.recipes),
+			InPantry: inPantry(strings.ToLower(a.name), pantry),
+		})
+	}
+	return items
+}
+
+// buildFreeform dedupes free-form ingredient strings by normalized text.
+func buildFreeform(recipes []PlannedRecipe, pantry []string) []Item {
 	byKey := map[string]aggregate{}
 	keys := []string{}
 	for _, r := range recipes {

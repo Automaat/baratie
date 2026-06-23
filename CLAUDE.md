@@ -40,7 +40,13 @@ clean scaffold.
 ### Domains
 
 - **recipes** (`/api/recipes`) — name, description, instructions, `ingredients`
-  + `tags` as Postgres `text[]`, servings, prep/cook minutes. Full CRUD.
+  + `tags` as Postgres `text[]`, servings, prep/cook minutes, per-serving
+  macros. Full CRUD. `PUT /api/recipes/{id}/ingredients` full-replaces the
+  structured (food-linked) ingredients and recomputes the macro columns from
+  them when the linked foods carry usable data.
+- **foods** (`/api/foods`) — food library: name + macros per 100 g. Full CRUD;
+  owns the `recipe_ingredients` junction and the startup best-effort migration
+  of free-form ingredient strings into structured ingredients.
 - **pantry** (`/api/pantry`) — name, quantity, unit, category, optional expiry.
   Full CRUD.
 - **mealplan** (`/api/meal-plan`) — dated entries (breakfast/lunch/dinner/snack)
@@ -49,8 +55,9 @@ clean scaffold.
   meal plan over `date_from`/`date_to`: per-day + period totals and average, with
   optional `target_*` query params yielding per-day deltas. No own table.
 - **shopping** (`/api/shopping-list`) — read-only consolidated ingredient list
-  from recipes planned over `date_from`/`date_to`, deduped by normalized text,
-  with source recipes + best-effort pantry cross-off. No own table.
+  from recipes planned over `date_from`/`date_to`. Structured ingredients are
+  summed per food/unit; recipes still on free-form strings are deduped by
+  normalized text. Source recipes + best-effort pantry cross-off. No own table.
 - **auth** (`/api/auth/*`, `/api/users`) — login/logout/me, admin-only user CRUD.
 
 ---
