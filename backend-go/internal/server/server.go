@@ -23,6 +23,7 @@ import (
 	"github.com/Automaat/baratie/backend-go/internal/nutrition"
 	"github.com/Automaat/baratie/backend-go/internal/pantry"
 	"github.com/Automaat/baratie/backend-go/internal/recipes"
+	"github.com/Automaat/baratie/backend-go/internal/shopping"
 )
 
 // requestObserver records every request into the Prometheus collectors and,
@@ -173,6 +174,9 @@ func registerDomainRoutes(r chi.Router, pool *pgxpool.Pool, logger *slog.Logger)
 	r.Route("/api/nutrition", func(r chi.Router) {
 		r.Get("/summary", nutritionHandler.Summary)
 	})
+
+	shoppingHandler := shopping.NewHandler(shopping.NewStore(pool), logger)
+	r.Get("/api/shopping-list", shoppingHandler.List)
 }
 
 // pinger is the subset of *pgxpool.Pool the health probe needs. Narrowed to an
