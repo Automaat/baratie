@@ -148,7 +148,13 @@
 			Skopiuj token teraz — nie zobaczysz go ponownie po zamknięciu tego okna.
 		</p>
 		<div class="flex items-center gap-2">
-			<input type="text" class="input font-mono text-sm" value={newToken} readonly />
+			<input
+				type="text"
+				class="input font-mono text-sm"
+				aria-label="Nowy token API"
+				value={newToken}
+				readonly
+			/>
 			<button type="button" class="btn preset-tonal-surface shrink-0" onclick={copyToken}>
 				{copied ? 'Skopiowano' : 'Kopiuj'}
 			</button>

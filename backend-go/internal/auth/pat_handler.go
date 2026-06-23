@@ -144,8 +144,10 @@ func validateToken(req *createTokenRequest) *httputil.ValidationError {
 	if err != nil {
 		return &httputil.ValidationError{Field: "expires_at", Msg: "must be YYYY-MM-DD"}
 	}
-	// Valid through the whole chosen day.
-	expiry := day.Add(24*time.Hour - time.Second)
+	// Valid through the whole chosen day: the last microsecond the timestamp
+	// column resolves, so `expires_at > now()` keeps it live until day's end
+	// without rolling the displayed date to the next day.
+	expiry := day.Add(24*time.Hour - time.Microsecond)
 	if !expiry.After(time.Now().UTC()) {
 		return &httputil.ValidationError{Field: "expires_at", Msg: "must be in the future"}
 	}
