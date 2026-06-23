@@ -25,7 +25,7 @@ func TestBuildDedupesAndAttributesRecipes(t *testing.T) {
 	if !reflect.DeepEqual(tomato.Recipes, []string{"Salad", "Soup"}) {
 		t.Fatalf("tomato recipes = %v, want [Salad Soup]", tomato.Recipes)
 	}
-	// 5 distinct ingredients: tomato, basil, salt, olive oil.
+	// 5 ingredient lines collapse to 4 distinct: tomato, basil, salt, olive oil.
 	if len(items) != 4 {
 		t.Fatalf("items = %d (%v), want 4 distinct", len(items), items)
 	}

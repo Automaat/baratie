@@ -52,10 +52,11 @@ func (s *Store) PlannedRecipes(ctx context.Context, from, to *time.Time) ([]Plan
 		"scan planned recipe", "iterate planned recipes")
 }
 
-// PantryNames returns the names of every item currently in the pantry, used for
-// best-effort cross-off of ingredients already in stock.
+// PantryNames returns the names of pantry items currently in stock
+// (quantity > 0), used for best-effort cross-off of ingredients already on
+// hand. Items at zero quantity are excluded so they aren't flagged as stocked.
 func (s *Store) PantryNames(ctx context.Context) ([]string, error) {
-	rows, err := s.pool.Query(ctx, `SELECT name FROM pantry_items`)
+	rows, err := s.pool.Query(ctx, `SELECT name FROM pantry_items WHERE quantity > 0`)
 	if err != nil {
 		return nil, fmt.Errorf("select pantry names: %w", err)
 	}
