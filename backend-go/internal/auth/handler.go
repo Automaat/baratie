@@ -25,16 +25,18 @@ const (
 type Handler struct {
 	store        *Store
 	tokens       *TokenService
+	pats         *PATStore
 	logger       *slog.Logger
 	cookieSecure bool
 }
 
-// NewHandler wires the store, token service, cookie policy and logger.
-func NewHandler(store *Store, tokens *TokenService, cookieSecure bool, logger *slog.Logger) *Handler {
+// NewHandler wires the user store, token service, PAT store, cookie policy and
+// logger.
+func NewHandler(store *Store, tokens *TokenService, pats *PATStore, cookieSecure bool, logger *slog.Logger) *Handler {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	return &Handler{store: store, tokens: tokens, cookieSecure: cookieSecure, logger: logger}
+	return &Handler{store: store, tokens: tokens, pats: pats, cookieSecure: cookieSecure, logger: logger}
 }
 
 type loginRequest struct {

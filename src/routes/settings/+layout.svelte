@@ -6,6 +6,7 @@
 
 	const tabs = $derived([
 		{ href: '/settings/navigation', label: 'Nawigacja' },
+		{ href: '/settings/tokens', label: 'Tokeny API' },
 		...(data.user?.isAdmin ? [{ href: '/settings/users', label: 'Użytkownicy' }] : [])
 	]);
 </script>

@@ -127,17 +127,22 @@ func New(cfg Config, logger *slog.Logger, deps Deps) http.Handler {
 // route behind a valid session.
 func registerRoutes(r chi.Router, cfg Config, pool *pgxpool.Pool, logger *slog.Logger) {
 	tokens := auth.NewTokenService(cfg.JWTSecret)
-	authHandler := auth.NewHandler(auth.NewStore(pool), tokens, cfg.CookieSecure, logger)
+	pats := auth.NewPATStore(pool)
+	authHandler := auth.NewHandler(auth.NewStore(pool), tokens, pats, cfg.CookieSecure, logger)
 
 	// Public — reachable without a session.
 	r.Post("/api/auth/login", authHandler.Login)
 	r.Post("/api/auth/logout", authHandler.Logout)
 
-	// Everything else requires authentication.
+	// Everything else requires authentication — a session JWT or a personal
+	// access token.
 	r.Group(func(r chi.Router) {
-		r.Use(auth.Authenticate(tokens))
+		r.Use(auth.Authenticate(tokens, pats))
 		r.Get("/api/auth/me", authHandler.Me)
 		r.Get("/api/users", authHandler.ListOwners)
+		r.Get("/api/auth/tokens", authHandler.ListTokens)
+		r.Post("/api/auth/tokens", authHandler.CreateToken)
+		r.Delete("/api/auth/tokens/{id}", authHandler.RevokeToken)
 		r.With(auth.RequireAdmin).Get("/api/auth/users", authHandler.ListUsers)
 		r.With(auth.RequireAdmin).Post("/api/auth/users", authHandler.CreateUser)
 		r.With(auth.RequireAdmin).Put("/api/auth/users/{id}", authHandler.UpdateUser)
