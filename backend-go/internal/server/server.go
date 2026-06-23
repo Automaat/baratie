@@ -20,6 +20,7 @@ import (
 	"github.com/Automaat/baratie/backend-go/internal/auth"
 	"github.com/Automaat/baratie/backend-go/internal/mealplan"
 	"github.com/Automaat/baratie/backend-go/internal/metrics"
+	"github.com/Automaat/baratie/backend-go/internal/nutrition"
 	"github.com/Automaat/baratie/backend-go/internal/pantry"
 	"github.com/Automaat/baratie/backend-go/internal/recipes"
 )
@@ -166,6 +167,11 @@ func registerDomainRoutes(r chi.Router, pool *pgxpool.Pool, logger *slog.Logger)
 		r.Post("/", mealHandler.Create)
 		r.Put("/{id}", mealHandler.Update)
 		r.Delete("/{id}", mealHandler.Delete)
+	})
+
+	nutritionHandler := nutrition.NewHandler(nutrition.NewStore(pool), logger)
+	r.Route("/api/nutrition", func(r chi.Router) {
+		r.Get("/summary", nutritionHandler.Summary)
 	})
 }
 

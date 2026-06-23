@@ -45,6 +45,9 @@ clean scaffold.
   Full CRUD.
 - **mealplan** (`/api/meal-plan`) — dated entries (breakfast/lunch/dinner/snack)
   optionally linked to a recipe; supports `date_from`/`date_to` filtering.
+- **nutrition** (`/api/nutrition/summary`) — read-only macro aggregation from the
+  meal plan over `date_from`/`date_to`: per-day + period totals and average, with
+  optional `target_*` query params yielding per-day deltas. No own table.
 - **auth** (`/api/auth/*`, `/api/users`) — login/logout/me, admin-only user CRUD.
 
 ---

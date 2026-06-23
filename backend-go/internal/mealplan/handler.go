@@ -97,11 +97,11 @@ func toEntry(req *createRequest) *Entry {
 // List serves GET /api/meal-plan with optional date_from / date_to filters.
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
-	from, ok := optionalDate(w, q.Get("date_from"), "date_from")
+	from, ok := httputil.OptionalDate(w, q.Get("date_from"), "date_from")
 	if !ok {
 		return
 	}
-	to, ok := optionalDate(w, q.Get("date_to"), "date_to")
+	to, ok := httputil.OptionalDate(w, q.Get("date_to"), "date_to")
 	if !ok {
 		return
 	}
@@ -187,17 +187,4 @@ func (h *Handler) writeStoreError(w http.ResponseWriter, err error) {
 		h.logger.Error("meal plan store", "err", err)
 		httputil.WriteDetailError(w, http.StatusInternalServerError, "Internal Server Error")
 	}
-}
-
-// optionalDate parses an optional YYYY-MM-DD query value. Empty → (nil, true).
-func optionalDate(w http.ResponseWriter, raw, field string) (*time.Time, bool) {
-	if strings.TrimSpace(raw) == "" {
-		return nil, true
-	}
-	t, err := time.Parse("2006-01-02", strings.TrimSpace(raw))
-	if err != nil {
-		httputil.WriteBodyValidationError(w, field, "must be YYYY-MM-DD", raw)
-		return nil, false
-	}
-	return &t, true
 }
