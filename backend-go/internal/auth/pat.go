@@ -31,6 +31,13 @@ const patRandomBytes = 32
 // scope enforcement exists yet.
 const patScopeFull = "full"
 
+// patLastUsedThrottle bounds how often last_used_at is rewritten. The stamp is
+// an audit breadcrumb, not part of the auth decision, so a token used in a tight
+// loop (a polling headless client) authenticates from a single read and the row
+// is rewritten at most once per interval — keeping the hot path off the
+// primary's write path and out of a per-row lock.
+const patLastUsedThrottle = time.Minute
+
 // ErrTokenNotFound is returned when a token id does not belong to the caller.
 var ErrTokenNotFound = errors.New("token not found")
 
@@ -127,35 +134,61 @@ func (s *PATStore) Delete(ctx context.Context, userID, id int) error {
 	return nil
 }
 
-// Authenticate validates a raw bearer token against the stored hashes. A single
-// statement matches the hash, rejects expired tokens, stamps last_used_at and
-// returns the owner's identity — yielding Claims with no JWT-style expiry.
-// ErrTokenNotFound when the token is unknown, revoked or expired.
+// Authenticate validates a raw bearer token against the stored hashes. The
+// lookup is a read: it matches the hash, rejects expired tokens and returns the
+// owner's identity — yielding Claims with no JWT-style expiry. last_used_at is
+// then refreshed best-effort and throttled (see touchLastUsed), so the hot path
+// stays a single read and an already-authenticated request never fails on the
+// breadcrumb write. ErrTokenNotFound when the token is unknown, revoked or
+// expired.
 func (s *PATStore) Authenticate(ctx context.Context, raw string) (*Claims, error) {
 	if !strings.HasPrefix(raw, PATPrefix) {
 		return nil, ErrTokenNotFound
 	}
 	row := s.pool.QueryRow(ctx, `
-		UPDATE personal_access_tokens p
-		SET last_used_at = (now() AT TIME ZONE 'utc')
-		FROM users u
-		WHERE p.token_hash = $1 AND p.user_id = u.id
-			AND (p.expires_at IS NULL OR p.expires_at > (now() AT TIME ZONE 'utc'))
-		RETURNING u.id, u.username, u.name, u.is_admin`,
+		SELECT u.id, u.username, u.name, u.is_admin, p.id, p.last_used_at
+		FROM personal_access_tokens p
+		JOIN users u ON p.user_id = u.id
+		WHERE p.token_hash = $1
+			AND (p.expires_at IS NULL OR p.expires_at > (now() AT TIME ZONE 'utc'))`,
 		hashPAT(raw))
 	var (
-		uid      int
-		username string
-		name     *string
-		isAdmin  bool
+		uid        int
+		username   string
+		name       *string
+		isAdmin    bool
+		patID      int
+		lastUsedAt *time.Time
 	)
-	if err := row.Scan(&uid, &username, &name, &isAdmin); err != nil {
+	if err := row.Scan(&uid, &username, &name, &isAdmin, &patID, &lastUsedAt); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrTokenNotFound
 		}
 		return nil, fmt.Errorf("authenticate token: %w", err)
 	}
+	s.touchLastUsed(ctx, patID, lastUsedAt)
 	return &Claims{UserID: uid, Username: username, Name: derefName(name), IsAdmin: isAdmin}, nil
+}
+
+// touchLastUsed refreshes a token's last_used_at, but only once the previous
+// stamp is older than patLastUsedThrottle, and never reports failure: the stamp
+// is an audit breadcrumb on a request that is already authenticated, so a
+// skipped or failed write must not turn into an auth error. Concurrent stale
+// requests simply write the same value.
+func (s *PATStore) touchLastUsed(ctx context.Context, id int, lastUsedAt *time.Time) {
+	if !patStampDue(lastUsedAt, time.Now().UTC()) {
+		return
+	}
+	// Best-effort: the auth decision is already made, so the result is dropped.
+	_, _ = s.pool.Exec(ctx,
+		`UPDATE personal_access_tokens SET last_used_at = (now() AT TIME ZONE 'utc') WHERE id = $1`,
+		id)
+}
+
+// patStampDue reports whether last_used_at is stale enough to rewrite: never
+// stamped, or last stamped at least patLastUsedThrottle ago.
+func patStampDue(lastUsedAt *time.Time, now time.Time) bool {
+	return lastUsedAt == nil || now.Sub(*lastUsedAt) >= patLastUsedThrottle
 }
 
 func scanPAT(row pgx.Row) (PersonalAccessToken, error) {

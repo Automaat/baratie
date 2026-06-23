@@ -96,6 +96,21 @@ func TestValidateTokenExpiry(t *testing.T) {
 	}
 }
 
+func TestPATStampDue(t *testing.T) {
+	now := time.Now().UTC()
+	if !patStampDue(nil, now) {
+		t.Fatal("a never-stamped token should be due")
+	}
+	fresh := now.Add(-patLastUsedThrottle / 2)
+	if patStampDue(&fresh, now) {
+		t.Fatal("a token stamped within the throttle window should not be due")
+	}
+	stale := now.Add(-patLastUsedThrottle - time.Second)
+	if !patStampDue(&stale, now) {
+		t.Fatal("a token stamped past the throttle window should be due")
+	}
+}
+
 // TestResolveClaimsJWTErrorIsCredential guards the 401-vs-500 split: a failed
 // JWT verification is a bad credential (401), never an infrastructure fault, so
 // it must not carry errAuthUnavailable.
