@@ -87,13 +87,20 @@ func RequireAdmin(next http.Handler) http.Handler {
 	})
 }
 
+// tokenFromRequest extracts the bearer credential, preferring an explicit
+// Authorization header over the brt_token cookie. The header is the stronger,
+// more intentional signal: a headless client presenting a PAT must not be
+// silently overridden by an ambient session cookie riding along on the same
+// host. In normal browser/SSR flows only one is ever present — the /api proxy
+// forwards the JWT as a header and never the cookie — so the order only matters
+// when a caller sends both.
 func tokenFromRequest(r *http.Request) string {
-	if c, err := r.Cookie(CookieName); err == nil && c.Value != "" {
-		return c.Value
-	}
 	const prefix = "Bearer "
 	if h := r.Header.Get("Authorization"); strings.HasPrefix(h, prefix) {
 		return strings.TrimPrefix(h, prefix)
+	}
+	if c, err := r.Cookie(CookieName); err == nil && c.Value != "" {
+		return c.Value
 	}
 	return ""
 }

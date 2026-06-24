@@ -25,9 +25,11 @@ test('create, use and revoke an API token', async ({ page, playwright }) => {
 	await dialog.getByRole('button', { name: 'Gotowe' }).click();
 	await expect(page.getByRole('cell', { name, exact: true })).toBeVisible();
 
-	// A fresh context carries no session cookie (cookies ignore port, so the
-	// logged-in brt_token on 127.0.0.1 would otherwise reach the backend and
-	// mask the bearer token we want to test).
+	// Raw API calls in their own context, straight to the backend. The session
+	// cookie may ride along (it ignores port), but the backend prefers the
+	// Authorization header, so the bearer token is what gets evaluated here —
+	// letting us prove the token alone authenticates and, once revoked, is
+	// rejected.
 	const apiCtx = await playwright.request.newContext();
 	try {
 		const authed = await apiCtx.get(`${API_URL}/api/auth/me`, {
