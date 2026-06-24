@@ -2,6 +2,9 @@ package auth
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -15,10 +18,23 @@ type ctxKey int
 
 const claimsKey ctxKey = 0
 
-// Authenticate verifies the session JWT — taken from the brt_token cookie or a
-// Bearer Authorization header — and stores the claims in the request context.
-// Requests without a valid token get 401.
-func Authenticate(tokens *TokenService) func(http.Handler) http.Handler {
+// errAuthUnavailable marks an authentication failure caused by an internal
+// fault — the token store being unreachable — rather than a bad credential. A
+// database blip while resolving a PAT must surface as 500, not a 401 "invalid
+// token" that would tell a headless client to throw away a perfectly good
+// token.
+var errAuthUnavailable = errors.New("auth backend unavailable")
+
+// Authenticate accepts either a session JWT or a personal access token — taken
+// from the brt_token cookie or a Bearer Authorization header — and stores the
+// resolved claims in the request context. A token carrying the PAT prefix is
+// looked up in the database (no 24h expiry); anything else is verified as a
+// JWT. A missing, bad or expired credential gets 401; a fault resolving it
+// (e.g. the token DB is down) gets 500.
+func Authenticate(tokens *TokenService, pats *PATStore, logger *slog.Logger) func(http.Handler) http.Handler {
+	if logger == nil {
+		logger = slog.Default()
+	}
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			raw := tokenFromRequest(r)
@@ -26,14 +42,36 @@ func Authenticate(tokens *TokenService) func(http.Handler) http.Handler {
 				httputil.WriteDetailError(w, http.StatusUnauthorized, "Not authenticated")
 				return
 			}
-			claims, err := tokens.Verify(raw)
+			claims, err := resolveClaims(r.Context(), tokens, pats, raw)
 			if err != nil {
+				if errors.Is(err, errAuthUnavailable) {
+					logger.Error("authenticate request", "err", err)
+					httputil.WriteDetailError(w, http.StatusInternalServerError, "Internal Server Error")
+					return
+				}
 				httputil.WriteDetailError(w, http.StatusUnauthorized, "Invalid or expired token")
 				return
 			}
 			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), claimsKey, claims)))
 		})
 	}
+}
+
+// resolveClaims dispatches on the token shape: a PAT-prefixed bearer goes to
+// the database-backed token store, everything else to the JWT verifier. A PAT
+// lookup that fails for any reason other than a missing/expired token is an
+// infrastructure fault, tagged errAuthUnavailable so the middleware can tell it
+// apart from a genuine bad credential. JWT verification is pure-CPU, so its
+// errors are always bad credentials.
+func resolveClaims(ctx context.Context, tokens *TokenService, pats *PATStore, raw string) (*Claims, error) {
+	if pats != nil && strings.HasPrefix(raw, PATPrefix) {
+		claims, err := pats.Authenticate(ctx, raw)
+		if err != nil && !errors.Is(err, ErrTokenNotFound) {
+			return nil, fmt.Errorf("%w: %w", errAuthUnavailable, err)
+		}
+		return claims, err
+	}
+	return tokens.Verify(raw)
 }
 
 // RequireAdmin rejects authenticated non-admin users with 403. It must run
@@ -49,13 +87,20 @@ func RequireAdmin(next http.Handler) http.Handler {
 	})
 }
 
+// tokenFromRequest extracts the bearer credential, preferring an explicit
+// Authorization header over the brt_token cookie. The header is the stronger,
+// more intentional signal: a headless client presenting a PAT must not be
+// silently overridden by an ambient session cookie riding along on the same
+// host. In normal browser/SSR flows only one is ever present — the /api proxy
+// forwards the JWT as a header and never the cookie — so the order only matters
+// when a caller sends both.
 func tokenFromRequest(r *http.Request) string {
-	if c, err := r.Cookie(CookieName); err == nil && c.Value != "" {
-		return c.Value
-	}
 	const prefix = "Bearer "
 	if h := r.Header.Get("Authorization"); strings.HasPrefix(h, prefix) {
 		return strings.TrimPrefix(h, prefix)
+	}
+	if c, err := r.Cookie(CookieName); err == nil && c.Value != "" {
+		return c.Value
 	}
 	return ""
 }

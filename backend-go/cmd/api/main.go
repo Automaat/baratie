@@ -180,6 +180,11 @@ func initDB(ctx context.Context, dsn string, logger *slog.Logger, adminUsername,
 		pool.Close()
 		return nil, 2
 	}
+	if err := auth.NewPATStore(pool).EnsureSchema(ctx); err != nil {
+		logger.Error("ensure tokens schema", "err", err)
+		pool.Close()
+		return nil, 2
+	}
 	if err := recipes.NewStore(pool).EnsureSchema(ctx); err != nil {
 		logger.Error("ensure recipes schema", "err", err)
 		pool.Close()

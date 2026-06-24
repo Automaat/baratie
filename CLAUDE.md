@@ -58,7 +58,11 @@ clean scaffold.
   from recipes planned over `date_from`/`date_to`. Structured ingredients are
   summed per food/unit; recipes still on free-form strings are deduped by
   normalized text. Source recipes + best-effort pantry cross-off. No own table.
-- **auth** (`/api/auth/*`, `/api/users`) — login/logout/me, admin-only user CRUD.
+- **auth** (`/api/auth/*`, `/api/users`) — login/logout/me, admin-only user CRUD,
+  and personal access tokens (`/api/auth/tokens` create/list/revoke, owner-scoped).
+  Long-lived bearer tokens for headless clients: `brt_pat_`-prefixed, stored as a
+  SHA-256 hash in `personal_access_tokens`, accepted by the auth middleware
+  alongside the session JWT (no 24h expiry; optional `expires_at`).
 
 ---
 
