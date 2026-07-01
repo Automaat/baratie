@@ -14,7 +14,10 @@ export const load: PageLoad = async ({ fetch, params }) => {
 		return { recipe };
 	} catch (err) {
 		if (err instanceof ApiError) {
-			throw error(err.status === 404 ? 404 : err.status, 'Nie udało się załadować przepisu');
+			throw error(
+				err.status,
+				err.status === 404 ? 'Nie znaleziono przepisu' : 'Nie udało się załadować przepisu'
+			);
 		}
 		throw err;
 	}
