@@ -1,0 +1,27 @@
+{
+	"name": "Baratie",
+	"short_name": "Baratie",
+	"description": "Przepisy, spiżarnia i planowanie posiłków.",
+	"id": "/",
+	"start_url": "/",
+	"scope": "/",
+	"display": "standalone",
+	"orientation": "portrait-primary",
+	"theme_color": "#d95b18",
+	"background_color": "#fff7ed",
+	"categories": ["food", "lifestyle", "productivity"],
+	"icons": [
+		{
+			"src": "/pwa-192x192.png",
+			"sizes": "192x192",
+			"type": "image/png",
+			"purpose": "any maskable"
+		},
+		{
+			"src": "/pwa-512x512.png",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "any maskable"
+		}
+	]
+}
