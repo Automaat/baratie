@@ -5,6 +5,9 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
 	plugins: [tailwindcss(), sveltekit()],
 	resolve: {
+		alias: {
+			cookie: new URL('./src/lib/server/cookie-v2-compat.js', import.meta.url).pathname
+		},
 		conditions: ['browser']
 	},
 	test: {
