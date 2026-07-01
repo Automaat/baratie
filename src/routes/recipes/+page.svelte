@@ -6,7 +6,7 @@
 	import { confirm } from '$lib/stores/confirm.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { formatMinutes, formatQuantity } from '$lib/utils/format';
-	import { BookOpen, Plus, Pencil, Trash2, Clock, Users, Flame, X } from 'lucide-svelte';
+	import { BookOpen, Plus, Pencil, Trash2, Clock, Users, Flame, X, Eye } from 'lucide-svelte';
 	import type { Recipe } from './+page';
 	import type { PageData } from './$types';
 
@@ -187,6 +187,9 @@
 					<div class="flex items-start justify-between gap-2">
 						<h2 class="h5 font-bold min-w-0">{recipe.name}</h2>
 						<div class="flex gap-1 shrink-0">
+							<a class="btn-icon btn-icon-sm" aria-label="Zobacz" href={`/recipes/${recipe.id}`}>
+								<Eye size={16} />
+							</a>
 							<button
 								type="button"
 								class="btn-icon btn-icon-sm"
