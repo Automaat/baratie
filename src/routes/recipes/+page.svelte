@@ -191,7 +191,7 @@
 						<h2 class="h5 font-bold min-w-0 flex items-center gap-2">
 							{recipe.name}
 							{#if recipe.batch}
-								<span class="badge preset-tonal-secondary text-xs shrink-0">batch</span>
+								<span class="badge preset-tonal-secondary text-xs shrink-0">wsadowy</span>
 							{/if}
 						</h2>
 						<div class="flex gap-1 shrink-0">
