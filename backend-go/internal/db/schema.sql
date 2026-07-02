@@ -13,6 +13,7 @@ CREATE TABLE recipes (
     servings integer NOT NULL DEFAULT 1,
     prep_minutes integer NOT NULL DEFAULT 0,
     cook_minutes integer NOT NULL DEFAULT 0,
+    batch boolean NOT NULL DEFAULT false,
     calories_kcal double precision NOT NULL DEFAULT 0,
     protein_g double precision NOT NULL DEFAULT 0,
     carbs_g double precision NOT NULL DEFAULT 0,
