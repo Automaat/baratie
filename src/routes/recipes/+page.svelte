@@ -49,6 +49,7 @@
 		servings: 2,
 		prep_minutes: 0,
 		cook_minutes: 0,
+		batch: false,
 		calories_kcal: 0,
 		protein_g: 0,
 		carbs_g: 0,
@@ -69,6 +70,7 @@
 				servings: editing.servings,
 				prep_minutes: editing.prep_minutes,
 				cook_minutes: editing.cook_minutes,
+				batch: editing.batch,
 				calories_kcal: editing.calories_kcal,
 				protein_g: editing.protein_g,
 				carbs_g: editing.carbs_g,
@@ -117,6 +119,7 @@
 			servings: Number(formData.servings),
 			prep_minutes: Number(formData.prep_minutes),
 			cook_minutes: Number(formData.cook_minutes),
+			batch: formData.batch,
 			calories_kcal: Number(formData.calories_kcal),
 			protein_g: Number(formData.protein_g),
 			carbs_g: Number(formData.carbs_g),
@@ -185,7 +188,12 @@
 			{#each recipes as recipe (recipe.id)}
 				<article class="card preset-tonal-surface p-4 space-y-3 flex flex-col">
 					<div class="flex items-start justify-between gap-2">
-						<h2 class="h5 font-bold min-w-0">{recipe.name}</h2>
+						<h2 class="h5 font-bold min-w-0 flex items-center gap-2">
+							{recipe.name}
+							{#if recipe.batch}
+								<span class="badge preset-tonal-secondary text-xs shrink-0">batch</span>
+							{/if}
+						</h2>
 						<div class="flex gap-1 shrink-0">
 							<button
 								type="button"
@@ -276,6 +284,19 @@
 				<input class="input" type="number" min="0" bind:value={formData.cook_minutes} />
 			</label>
 		</div>
+		<label class="flex items-center gap-2">
+			<input type="checkbox" class="checkbox" bind:checked={formData.batch} />
+			<span class="text-sm">
+				Przepis wsadowy (batch) — gotowany raz, jedzony przez {formData.servings} porcji
+			</span>
+		</label>
+		{#if formData.batch}
+			<p class="text-xs text-surface-700-300">
+				Składniki liczą się na liście zakupów raz, niezależnie ile razy zaplanujesz ten przepis w
+				tygodniu. Wyłącz, jeśli gotujesz porcję na świeżo za każdym razem — wtedy składniki mnożą
+				się przez liczbę zaplanowanych wystąpień.
+			</p>
+		{/if}
 		<label class="label">
 			<span>Składniki (jeden na linię)</span>
 			<textarea class="textarea" rows="4" bind:value={formData.ingredients}></textarea>

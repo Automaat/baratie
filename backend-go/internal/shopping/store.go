@@ -66,21 +66,29 @@ func (s *Store) PlannedRecipes(ctx context.Context, from, to *time.Time) ([]Plan
 }
 
 // PlannedStructured returns the structured ingredients of every distinct recipe
-// planned within the optional [from, to] date range (each recipe's ingredients
-// once, regardless of how often it is planned), ordered by recipe then food.
+// planned within the optional [from, to] date range, ordered by recipe then
+// food. A recipe cooked once and eaten across several meals (Batch = true,
+// e.g. a big pot of curry) has its ingredients counted once regardless of how
+// many times it's planned. A recipe cooked fresh each time (Batch = false,
+// the default) has its ingredients multiplied by the number of times it's
+// planned in range, so e.g. planning a single-serving bowl on three different
+// days puts 3x the ingredients on the list.
 func (s *Store) PlannedStructured(ctx context.Context, from, to *time.Time) ([]StructuredLine, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT r.name, f.name, ri.amount, ri.unit
-		FROM recipe_ingredients ri
-		JOIN recipes r ON r.id = ri.recipe_id
-		JOIN foods f ON f.id = ri.food_id
-		WHERE ri.recipe_id IN (
-			SELECT DISTINCT m.recipe_id
+		WITH planned_counts AS (
+			SELECT m.recipe_id, COUNT(*) AS n
 			FROM meal_plan_entries m
 			WHERE m.recipe_id IS NOT NULL
 			  AND ($1::date IS NULL OR m.plan_date >= $1)
 			  AND ($2::date IS NULL OR m.plan_date <= $2)
+			GROUP BY m.recipe_id
 		)
+		SELECT r.name, f.name,
+		       ri.amount * (CASE WHEN r.batch THEN 1 ELSE pc.n END), ri.unit
+		FROM recipe_ingredients ri
+		JOIN recipes r ON r.id = ri.recipe_id
+		JOIN foods f ON f.id = ri.food_id
+		JOIN planned_counts pc ON pc.recipe_id = r.id
 		ORDER BY r.name, f.name`, from, to)
 	if err != nil {
 		return nil, fmt.Errorf("select planned structured ingredients: %w", err)

@@ -23,6 +23,7 @@ type response struct {
 	PrepMinutes  int           `json:"prep_minutes"`
 	CookMinutes  int           `json:"cook_minutes"`
 	TotalMinutes int           `json:"total_minutes"`
+	Batch        bool          `json:"batch"`
 	CaloriesKcal float64       `json:"calories_kcal"`
 	ProteinG     float64       `json:"protein_g"`
 	CarbsG       float64       `json:"carbs_g"`
@@ -66,6 +67,7 @@ type createRequest struct {
 	Servings     int      `json:"servings"`
 	PrepMinutes  int      `json:"prep_minutes"`
 	CookMinutes  int      `json:"cook_minutes"`
+	Batch        bool     `json:"batch"`
 	CaloriesKcal float64  `json:"calories_kcal"`
 	ProteinG     float64  `json:"protein_g"`
 	CarbsG       float64  `json:"carbs_g"`
@@ -98,6 +100,7 @@ func toResponse(r *Recipe) response {
 		PrepMinutes:  r.PrepMinutes,
 		CookMinutes:  r.CookMinutes,
 		TotalMinutes: r.PrepMinutes + r.CookMinutes,
+		Batch:        r.Batch,
 		CaloriesKcal: r.CaloriesKcal,
 		ProteinG:     r.ProteinG,
 		CarbsG:       r.CarbsG,
@@ -135,6 +138,7 @@ func toRecipe(req *createRequest) *Recipe {
 		Servings:     req.Servings,
 		PrepMinutes:  req.PrepMinutes,
 		CookMinutes:  req.CookMinutes,
+		Batch:        req.Batch,
 		CaloriesKcal: req.CaloriesKcal,
 		ProteinG:     req.ProteinG,
 		CarbsG:       req.CarbsG,
