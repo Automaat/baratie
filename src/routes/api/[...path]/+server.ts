@@ -4,7 +4,7 @@
 // /api/* to the backend and attaches the session token from the brt_token
 // cookie as a Bearer header. Keeps the JWT out of client-side JavaScript.
 import { env } from '$env/dynamic/private';
-import { OIDC_API_PREFIX, OIDC_STATE_COOKIE } from '$lib/utils/oidc';
+import { isOidcApiPath, OIDC_STATE_COOKIE } from '$lib/utils/oidc';
 import type { RequestHandler } from './$types';
 
 function backendURL(path: string, search: string): string {
@@ -12,8 +12,10 @@ function backendURL(path: string, search: string): string {
 	return `${base}/api/${path}${search}`;
 }
 
-function isOidcPath(path: string): boolean {
-	return `/api/${path}`.startsWith(OIDC_API_PREFIX);
+// SvelteKit decodes `..%2F` in the rest param; a dot segment would escape
+// /api on the backend (e.g. reach /metrics).
+function hasDotSegment(path: string): boolean {
+	return path.split('/').some((segment) => segment === '.' || segment === '..');
 }
 
 /**
@@ -42,7 +44,10 @@ function responseHeadersFrom(upstream: Response, oidc: boolean): Headers {
 }
 
 const proxy: RequestHandler = async ({ request, params, cookies, url, fetch }) => {
-	const oidc = isOidcPath(params.path);
+	if (hasDotSegment(params.path)) {
+		return Response.json({ detail: 'Not Found' }, { status: 404 });
+	}
+	const oidc = isOidcApiPath(`/api/${params.path}`);
 	const headers = new Headers();
 	const contentType = request.headers.get('content-type');
 	if (contentType) {

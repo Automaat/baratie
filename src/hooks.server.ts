@@ -1,6 +1,6 @@
 import { redirect, type Handle, type HandleFetch } from '@sveltejs/kit';
 import { env } from '$env/dynamic/public';
-import { OIDC_API_PREFIX } from '$lib/utils/oidc';
+import { isOidcApiPath } from '$lib/utils/oidc';
 
 interface SessionUser {
 	username: string;
@@ -53,7 +53,7 @@ function decodeUser(token: string): SessionUser | null {
  * clearing a stale token there would undo a fresh OIDC login.
  */
 function mayClearStaleToken(pathname: string): boolean {
-	return !pathname.startsWith(OIDC_API_PREFIX);
+	return !isOidcApiPath(pathname);
 }
 
 export const handle: Handle = async ({ event, resolve }) => {
@@ -74,9 +74,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	const isAsset = pathname.startsWith('/_app/') || /\.\w+$/.test(pathname);
 	const isLogin = pathname === '/login';
 	const isPublicApi =
-		pathname === '/api/auth/login' ||
-		pathname === '/api/auth/logout' ||
-		pathname.startsWith(OIDC_API_PREFIX);
+		pathname === '/api/auth/login' || pathname === '/api/auth/logout' || isOidcApiPath(pathname);
 	if (isAsset || isLogin || isPublicApi) {
 		return resolve(event);
 	}

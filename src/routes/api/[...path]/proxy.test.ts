@@ -88,4 +88,16 @@ describe('/api proxy', () => {
 		expect(sent.get('authorization')).toBe('Bearer session-jwt');
 		expect(sent.get('cookie')).toBeNull();
 	});
+
+	it.each(['auth/oidc/../../metrics', 'auth/oidc/./status', '..'])(
+		'rejects dot segments in %s without calling the backend',
+		async (path) => {
+			const { event, calls } = proxyEvent(path, {}, new Response(null, { status: 200 }));
+
+			const res = await GET(event);
+
+			expect(res.status).toBe(404);
+			expect(calls).toHaveLength(0);
+		}
+	);
 });

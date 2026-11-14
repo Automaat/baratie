@@ -35,6 +35,13 @@ describe('handle', () => {
 		expect(del).not.toHaveBeenCalled();
 	});
 
+	it('requires a session for paths that only start with the OIDC prefix', async () => {
+		const { promise, resolve } = run('/api/auth/oidc/..%2F..%2Fmetrics');
+		const res = await promise;
+		expect(resolve).not.toHaveBeenCalled();
+		expect(res.status).toBe(401);
+	});
+
 	it('still clears a stale token and rejects other API calls', async () => {
 		const { promise, del, resolve } = run('/api/recipes', expiredToken);
 		const res = await promise;

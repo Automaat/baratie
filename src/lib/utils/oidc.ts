@@ -1,6 +1,17 @@
-export const OIDC_API_PREFIX = '/api/auth/oidc/';
 export const OIDC_STATE_COOKIE = 'brt_oidc_state';
 export const OIDC_LOGIN_PATH = '/api/auth/oidc/login';
+
+const OIDC_API_PATHS = new Set([
+	'/api/auth/oidc/status',
+	OIDC_LOGIN_PATH,
+	'/api/auth/oidc/callback'
+]);
+
+// isOidcApiPath matches the OIDC endpoints exactly; a prefix match would let
+// a decoded `..` segment reach other backend routes without a session.
+export function isOidcApiPath(pathname: string): boolean {
+	return OIDC_API_PATHS.has(pathname);
+}
 
 const OIDC_ERROR_MESSAGES: Record<string, string> = {
 	oidc_no_user:
