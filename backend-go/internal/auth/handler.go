@@ -104,17 +104,12 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		httputil.WriteDetailError(w, http.StatusUnauthorized, "Invalid username or password")
 		return
 	}
-	ttl := sessionTTL
-	if req.RememberMe {
-		ttl = rememberTTL
-	}
-	token, err := h.tokens.Sign(user.ID, user.Username, derefName(user.Name), user.IsAdmin, ttl)
+	token, err := startSession(w, h.tokens, user, h.cookieSecure, req.RememberMe)
 	if err != nil {
 		h.logger.Error("sign token", "err", err)
 		httputil.WriteDetailError(w, http.StatusInternalServerError, "Internal Server Error")
 		return
 	}
-	h.setSessionCookie(w, token, req.RememberMe, ttl)
 	httputil.WriteJSON(w, http.StatusOK, loginResponse{Token: token, User: toUserResponse(user)})
 }
 
@@ -268,19 +263,29 @@ func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	httputil.WriteJSON(w, http.StatusOK, toUserResponse(user))
 }
 
-func (h *Handler) setSessionCookie(w http.ResponseWriter, token string, persistent bool, ttl time.Duration) {
+// startSession signs a session JWT for user and sets it as the brt_token
+// cookie. Every login method (password, OIDC) goes through here so they all
+// produce the same session.
+func startSession(w http.ResponseWriter, tokens *TokenService, user *User, cookieSecure, remember bool) (string, error) {
+	ttl := sessionTTL
+	if remember {
+		ttl = rememberTTL
+	}
+	token, err := tokens.Sign(user.ID, user.Username, derefName(user.Name), user.IsAdmin, ttl)
+	if err != nil {
+		return "", err
+	}
 	c := &http.Cookie{
 		Name:     CookieName,
 		Value:    token,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   h.cookieSecure,
+		Secure:   cookieSecure,
 		SameSite: http.SameSiteLaxMode,
 	}
-	// Persistent cookie for "remember me"; otherwise a session cookie that
-	// the browser drops on close.
-	if persistent {
+	if remember {
 		c.MaxAge = int(ttl.Seconds())
 	}
 	http.SetCookie(w, c)
+	return token, nil
 }

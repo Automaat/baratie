@@ -1,8 +1,14 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
-import type { Actions } from './$types';
+import { fetchOidcEnabled, oidcErrorMessage } from '$lib/utils/oidc';
+import type { Actions, PageServerLoad } from './$types';
 
 const cookieSecure = env.BRT_COOKIE_SECURE === 'true';
+
+export const load: PageServerLoad = async ({ fetch, url }) => ({
+	oidcEnabled: await fetchOidcEnabled(fetch),
+	oidcError: oidcErrorMessage(url.searchParams.get('error'))
+});
 
 export const actions: Actions = {
 	default: async ({ request, cookies, fetch }) => {

@@ -4,6 +4,7 @@
 // /api/* to the backend and attaches the session token from the brt_token
 // cookie as a Bearer header. Keeps the JWT out of client-side JavaScript.
 import { env } from '$env/dynamic/private';
+import { isOidcApiPath, OIDC_STATE_COOKIE } from '$lib/utils/oidc';
 import type { RequestHandler } from './$types';
 
 function backendURL(path: string, search: string): string {
@@ -11,7 +12,42 @@ function backendURL(path: string, search: string): string {
 	return `${base}/api/${path}${search}`;
 }
 
+// SvelteKit decodes `..%2F` in the rest param; a dot segment would escape
+// /api on the backend (e.g. reach /metrics).
+function hasDotSegment(path: string): boolean {
+	return path.split('/').some((segment) => segment === '.' || segment === '..');
+}
+
+/**
+ * Copies content-type and location, so redirects pass through untouched.
+ * Set-Cookie is forwarded only for the OIDC flow, which sets its state cookie
+ * and the session through the backend. Elsewhere it is dropped on purpose: the
+ * /login action calls this proxy through SvelteKit's internal fetch, which
+ * would apply the backend's session cookie on top of the one the action sets.
+ */
+function responseHeadersFrom(upstream: Response, oidc: boolean): Headers {
+	const headers = new Headers();
+	const contentType = upstream.headers.get('content-type');
+	if (contentType) {
+		headers.set('content-type', contentType);
+	}
+	const location = upstream.headers.get('location');
+	if (location) {
+		headers.set('location', location);
+	}
+	if (oidc) {
+		for (const cookie of upstream.headers.getSetCookie()) {
+			headers.append('set-cookie', cookie);
+		}
+	}
+	return headers;
+}
+
 const proxy: RequestHandler = async ({ request, params, cookies, url, fetch }) => {
+	if (hasDotSegment(params.path)) {
+		return Response.json({ detail: 'Not Found' }, { status: 404 });
+	}
+	const oidc = isOidcApiPath(`/api/${params.path}`);
 	const headers = new Headers();
 	const contentType = request.headers.get('content-type');
 	if (contentType) {
@@ -21,26 +57,25 @@ const proxy: RequestHandler = async ({ request, params, cookies, url, fetch }) =
 	if (token) {
 		headers.set('authorization', `Bearer ${token}`);
 	}
+	const oidcState = oidc ? cookies.get(OIDC_STATE_COOKIE) : undefined;
+	if (oidcState) {
+		headers.set('cookie', `${OIDC_STATE_COOKIE}=${oidcState}`);
+	}
 
-	const init: RequestInit = { method: request.method, headers };
+	const init: RequestInit = { method: request.method, headers, redirect: 'manual' };
 	if (request.method !== 'GET' && request.method !== 'HEAD') {
 		init.body = await request.text();
 	}
 
 	const upstream = await fetch(backendURL(params.path, url.search), init);
 	const body = await upstream.arrayBuffer();
-	// Only content-type is forwarded. Set-Cookie in particular is dropped on
-	// purpose — the backend's own session cookie must never reach the browser;
-	// frontend sessions are managed by the /login and /logout routes.
-	const responseHeaders = new Headers();
-	const responseType = upstream.headers.get('content-type');
-	if (responseType) {
-		responseHeaders.set('content-type', responseType);
-	}
 	// 204/304 are null-body statuses — Response throws if handed a body, even
 	// an empty one (e.g. the backend's 204 on DELETE).
 	const responseBody = body.byteLength > 0 ? body : null;
-	return new Response(responseBody, { status: upstream.status, headers: responseHeaders });
+	return new Response(responseBody, {
+		status: upstream.status,
+		headers: responseHeadersFrom(upstream, oidc)
+	});
 };
 
 export const GET = proxy;

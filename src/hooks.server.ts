@@ -1,5 +1,6 @@
 import { redirect, type Handle, type HandleFetch } from '@sveltejs/kit';
 import { env } from '$env/dynamic/public';
+import { isOidcApiPath } from '$lib/utils/oidc';
 
 interface SessionUser {
 	username: string;
@@ -46,6 +47,15 @@ function decodeUser(token: string): SessionUser | null {
 	}
 }
 
+/**
+ * OIDC routes set brt_token through the proxied backend response. SvelteKit
+ * appends cookies.delete() after the response's own Set-Cookie headers, so
+ * clearing a stale token there would undo a fresh OIDC login.
+ */
+function mayClearStaleToken(pathname: string): boolean {
+	return !isOidcApiPath(pathname);
+}
+
 export const handle: Handle = async ({ event, resolve }) => {
 	const { pathname } = event.url;
 	const token = event.cookies.get('brt_token');
@@ -57,13 +67,14 @@ export const handle: Handle = async ({ event, resolve }) => {
 	}
 
 	// A lingering expired/invalid token — clear it so the browser stops sending it.
-	if (token) {
+	if (token && mayClearStaleToken(pathname)) {
 		event.cookies.delete('brt_token', { path: '/' });
 	}
 
 	const isAsset = pathname.startsWith('/_app/') || /\.\w+$/.test(pathname);
 	const isLogin = pathname === '/login';
-	const isPublicApi = pathname === '/api/auth/login' || pathname === '/api/auth/logout';
+	const isPublicApi =
+		pathname === '/api/auth/login' || pathname === '/api/auth/logout' || isOidcApiPath(pathname);
 	if (isAsset || isLogin || isPublicApi) {
 		return resolve(event);
 	}

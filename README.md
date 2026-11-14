@@ -11,7 +11,7 @@ plan **meals** for the week. Runs on a home NAS, same stack and look as
 - **Database:** PostgreSQL 18
 - **UI:** Tailwind CSS 4 + Skeleton (sahara theme) + lucide icons
 - **Charts:** Apache ECharts 6
-- **Auth:** JWT session cookie, admin seeded on startup
+- **Auth:** JWT session cookie, admin seeded on startup, optional Authelia OIDC SSO
 - **Deployment:** Docker Compose, images on ghcr.io
 
 > Exact versions live in `package.json` and `backend-go/go.mod` — those
@@ -91,6 +91,25 @@ docker-compose up -d
 `ORIGIN`, `CORS_ORIGINS`, and `PUBLIC_API_URL_BROWSER` can be overridden for
 deployments behind a custom domain. Set `BRT_COOKIE_SECURE=true` when served
 over HTTPS.
+
+### Single sign-on (Authelia / OIDC)
+
+Optional. Set all four backend variables to show a "Zaloguj przez Authelię"
+button on the login page; leave all unset to disable it. A partial set fails
+startup.
+
+| Variable                 | Example                                               |
+| ------------------------ | ----------------------------------------------------- |
+| `BRT_OIDC_ISSUER_URL`    | `https://auth.mskalski.dev`                           |
+| `BRT_OIDC_CLIENT_ID`     | `baratie`                                             |
+| `BRT_OIDC_CLIENT_SECRET` | client secret registered in Authelia                  |
+| `BRT_OIDC_REDIRECT_URL`  | `https://baratie.mskalski.dev/api/auth/oidc/callback` |
+
+The client uses the authorization-code flow with PKCE (S256),
+`client_secret_basic` and scopes `openid profile email`. The provider's
+`preferred_username` must match an existing Baratie user; no accounts are
+created. Password login and personal access tokens keep working, and the
+backend starts even when the provider is down.
 
 ## License
 

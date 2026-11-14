@@ -81,6 +81,7 @@ type Config struct {
 	// AccessLog enables one structured info log per HTTP request
 	// (BRT_ACCESS_LOG). Prometheus metrics are always recorded.
 	AccessLog bool
+	OIDC      auth.OIDCConfig
 }
 
 // Deps bundles the runtime dependencies the router needs to construct handlers
@@ -128,11 +129,16 @@ func New(cfg Config, logger *slog.Logger, deps Deps) http.Handler {
 func registerRoutes(r chi.Router, cfg Config, pool *pgxpool.Pool, logger *slog.Logger) {
 	tokens := auth.NewTokenService(cfg.JWTSecret)
 	pats := auth.NewPATStore(pool)
-	authHandler := auth.NewHandler(auth.NewStore(pool), tokens, pats, cfg.CookieSecure, logger)
+	users := auth.NewStore(pool)
+	authHandler := auth.NewHandler(users, tokens, pats, cfg.CookieSecure, logger)
+	oidcHandler := auth.NewOIDCHandler(cfg.OIDC, users, tokens, cfg.CookieSecure, logger)
 
 	// Public — reachable without a session.
 	r.Post("/api/auth/login", authHandler.Login)
 	r.Post("/api/auth/logout", authHandler.Logout)
+	r.Get("/api/auth/oidc/status", oidcHandler.Status)
+	r.Get("/api/auth/oidc/login", oidcHandler.Login)
+	r.Get("/api/auth/oidc/callback", oidcHandler.Callback)
 
 	// Everything else requires authentication — a session JWT or a personal
 	// access token.

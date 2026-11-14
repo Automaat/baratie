@@ -83,12 +83,22 @@ func run() int {
 		return 2
 	}
 
+	oidcCfg, err := auth.ParseOIDCConfig(os.Getenv)
+	if err != nil {
+		logger.Error("invalid OIDC configuration", "err", err)
+		return 2
+	}
+	if oidcCfg.Enabled() {
+		logger.Info("OIDC login enabled", "issuer", oidcCfg.IssuerURL, "client_id", oidcCfg.ClientID)
+	}
+
 	cfg := server.Config{
 		Addr:         envOr("BRT_ADDR", ":8000"),
 		CORSOrigins:  envOrPresent("CORS_ORIGINS", "http://localhost:3000"),
 		JWTSecret:    jwtSecret,
 		CookieSecure: envOr("BRT_COOKIE_SECURE", "false") == "true",
 		AccessLog:    envOr("BRT_ACCESS_LOG", "false") == "true",
+		OIDC:         oidcCfg,
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

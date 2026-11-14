@@ -31,6 +31,10 @@ services:
       - BRT_ADMIN_PASSWORD=${BRT_ADMIN_PASSWORD:-admin}
       - BRT_COOKIE_SECURE=false
       - BRT_ACCESS_LOG=${BRT_ACCESS_LOG:-false}
+      - BRT_OIDC_ISSUER_URL=${BRT_OIDC_ISSUER_URL:-}
+      - BRT_OIDC_CLIENT_ID=${BRT_OIDC_CLIENT_ID:-}
+      - BRT_OIDC_CLIENT_SECRET=${BRT_OIDC_CLIENT_SECRET:-}
+      - BRT_OIDC_REDIRECT_URL=${BRT_OIDC_REDIRECT_URL:-}
     depends_on:
       postgres:
         condition: service_healthy
