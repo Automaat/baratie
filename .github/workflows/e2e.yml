@@ -54,10 +54,6 @@ jobs:
       - name: Override mise NODE_ENV
         run: echo "NODE_ENV=production" >> "$GITHUB_ENV"
 
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: backend-go/go.mod
-          cache-dependency-path: backend-go/go.sum
 
       - name: Install frontend dependencies
         run: npm ci --include=dev
