@@ -101,6 +101,15 @@ clean scaffold.
   hard-fails at startup without `BRT_JWT_SECRET` / `BRT_ADMIN_PASSWORD`.
 - Session cookie `brt_token`; `hooks.server.ts` gates page navigation and the
   `/api` proxy.
+- Optional OIDC SSO (Authelia): set all of `BRT_OIDC_ISSUER_URL`,
+  `BRT_OIDC_CLIENT_ID`, `BRT_OIDC_CLIENT_SECRET`, `BRT_OIDC_REDIRECT_URL`
+  (`https://<host>/api/auth/oidc/callback`) on the backend, or none. A partial
+  set fails startup. Auth-code flow with PKCE S256 and `client_secret_basic`;
+  `preferred_username` must match an existing user (no auto-provisioning).
+  Discovery is lazy, so password login keeps working while the provider is
+  down. Public endpoints: `/api/auth/oidc/{status,login,callback}`; the `/api`
+  proxy forwards their redirects and `Set-Cookie` headers (other routes still
+  drop `Set-Cookie`).
 
 ---
 
