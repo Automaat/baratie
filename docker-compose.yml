@@ -37,7 +37,7 @@ services:
       - backend-go
 
   postgres:
-    image: postgres:18-alpine
+    image: postgres:19-alpine
     container_name: baratie-postgres
     environment:
       - POSTGRES_USER=baratie
